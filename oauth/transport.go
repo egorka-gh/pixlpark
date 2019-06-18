@@ -116,6 +116,7 @@ func cloneRequest(r *http.Request) *http.Request {
 	for k, s := range r.Header {
 		r2.Header[k] = append([]string(nil), s...)
 	}
+	// copy url
 	url2 := *r.URL
 	r2.URL = &url2
 	return r2

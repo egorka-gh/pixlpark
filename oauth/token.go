@@ -36,11 +36,11 @@ const accessExpiryDelta = 40 * time.Second
 type Token struct {
 
 	//Starting token /oauth/requesttoken
-	RequestToken string
+	RequestToken string `json:"RequestToken,omitempty"`
 
 	// AccessToken is the token that authorizes and authenticates
 	// the requests.
-	AccessToken string `json:"access_token"`
+	AccessToken string `json:"AccessToken"`
 
 	// TokenType is the type of token.
 	// The Type method returns either this or "Bearer", the default.
@@ -49,13 +49,13 @@ type Token struct {
 	// RefreshToken is a token that's used by the application
 	// (as opposed to the user) to refresh the access token
 	// if it expires.
-	RefreshToken string `json:"refresh_token,omitempty"`
+	RefreshToken string `json:"RefreshToken,omitempty"`
 
 	// Expiry is the expiration time of the access token and refresh token.
 	// to separate expiration time of the access token used accessExpiryDelta
 	//
 	// If zero, TokenSource consider expired and not valid
-	Expiry time.Time `json:"expiry,omitempty"`
+	Expiry time.Time `json:"Expires,omitempty"`
 
 	// raw optionally contains extra metadata from the server
 	// when updating a token.

@@ -293,6 +293,12 @@ func (tf *tokenRefresher) Token() (*Token, error) {
 	return tk, err
 }
 
+func (tf *tokenRefresher) SetRefreshToken(newToken string) {
+	if newToken != "" && tf.refreshToken != newToken {
+		tf.refreshToken = newToken
+	}
+}
+
 // reuseTokenSource is a TokenSource that holds a single token in memory
 // and validates its expiry before each call to retrieve it with
 // Token. If it's expired, it will be auto-refreshed using the
@@ -315,6 +321,7 @@ func (s *reuseTokenSource) Token() (*Token, error) {
 		return s.t, nil
 	}
 	if s.t.CanRefresh() {
+		//refresh token
 		t, err := s.refresher.Token()
 		if err != nil {
 			return nil, err
@@ -322,9 +329,14 @@ func (s *reuseTokenSource) Token() (*Token, error) {
 		s.t = t
 		return t, nil
 	}
+	//get new token
 	t, err := s.fetcher.Token()
 	if err != nil {
 		return nil, err
+	}
+	//update refresh token
+	if rt, ok := s.refresher.(*tokenRefresher); ok {
+		rt.SetRefreshToken(t.RefreshToken)
 	}
 	s.t = t
 	return t, nil
