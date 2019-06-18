@@ -21,6 +21,11 @@ import (
 // expirations due to client-server time mismatches.
 const expiryDelta = 10 * time.Second
 
+// accessExpiryDelta determines how earlier a token should be considered
+// expired than its actual expiration time. It is used to avoid late
+// expirations due to client-server time mismatches.
+const accessExpiryDelta = 40 * time.Second
+
 // Token represents the credentials used to authorize
 // the requests to access protected resources on the OAuth 2.0
 // provider's backend.
@@ -29,6 +34,10 @@ const expiryDelta = 10 * time.Second
 // directly. They're exported mostly for use by related packages
 // implementing derivative OAuth2 flows.
 type Token struct {
+
+	//Starting token /oauth/requesttoken
+	RequestToken string
+
 	// AccessToken is the token that authorizes and authenticates
 	// the requests.
 	AccessToken string `json:"access_token"`
@@ -42,11 +51,10 @@ type Token struct {
 	// if it expires.
 	RefreshToken string `json:"refresh_token,omitempty"`
 
-	// Expiry is the optional expiration time of the access token.
+	// Expiry is the expiration time of the access token and refresh token.
+	// to separate expiration time of the access token used accessExpiryDelta
 	//
-	// If zero, TokenSource implementations will reuse the same
-	// token forever and RefreshToken or equivalent
-	// mechanisms for that TokenSource will not be used.
+	// If zero, TokenSource consider expired and not valid
 	Expiry time.Time `json:"expiry,omitempty"`
 
 	// raw optionally contains extra metadata from the server
@@ -78,6 +86,17 @@ func (t *Token) Type() string {
 // returned by this package.
 func (t *Token) SetAuthHeader(r *http.Request) {
 	r.Header.Set("Authorization", t.Type()+" "+t.AccessToken)
+}
+
+// SetAuthURLParametr adds the Authorization to r url query using the access
+// token in t.
+//
+// This method is unnecessary when using Transport or an HTTP Client
+// returned by this package.
+func (t *Token) SetAuthURLParametr(r *http.Request) {
+	q := r.URL.Query()
+	q.Add("oauth_token", t.AccessToken)
+	r.URL.RawQuery = q.Encode()
 }
 
 // WithExtra returns a new Token that's a clone of t, but using the
@@ -121,18 +140,32 @@ func (t *Token) Extra(key string) interface{} {
 // timeNow is time.Now but pulled out as a variable for tests.
 var timeNow = time.Now
 
-// expired reports whether the token is expired.
+// expired reports whether the access token is expired.
 // t must be non-nil.
 func (t *Token) expired() bool {
 	if t.Expiry.IsZero() {
-		return false
+		return true
+	}
+	return t.Expiry.Round(0).Add(-expiryDelta - accessExpiryDelta).Before(timeNow())
+}
+
+// refreshExpired reports whether the refresh token is expired.
+// t must be non-nil.
+func (t *Token) refreshExpired() bool {
+	if t.Expiry.IsZero() {
+		return true
 	}
 	return t.Expiry.Round(0).Add(-expiryDelta).Before(timeNow())
 }
 
-// Valid reports whether t is non-nil, has an AccessToken, and is not expired.
+// Valid reports whether t is non-nil, has an AccessToken, and AccessToken is not expired.
 func (t *Token) Valid() bool {
 	return t != nil && t.AccessToken != "" && !t.expired()
+}
+
+// CanRefresh reports whether t is non-nil, has an RefreshToken, and RefreshToken is not expired.
+func (t *Token) CanRefresh() bool {
+	return t != nil && t.RefreshToken != "" && !t.refreshExpired()
 }
 
 // tokenFromInternal maps an *internal.Token struct into
@@ -141,13 +174,10 @@ func tokenFromInternal(t *internal.Token) *Token {
 	if t == nil {
 		return nil
 	}
-	accessToken := t.AccessToken
-	if t.RequestToken != nil && accessToken == nil {
-		accessToken := t.RequestToken
-	}
 
 	return &Token{
-		AccessToken:  accessToken,
+		RequestToken: t.RequestToken,
+		AccessToken:  t.AccessToken,
 		TokenType:    t.TokenType,
 		RefreshToken: t.RefreshToken,
 		Expiry:       t.Expiry,
@@ -159,7 +189,7 @@ func tokenFromInternal(t *internal.Token) *Token {
 // This token is then mapped from *internal.Token into an *oauth2.Token which is returned along
 // with an error..
 func retrieveToken(ctx context.Context, c *Config, tokenURL string, v url.Values) (*Token, error) {
-	tk, err := internal.RetrieveToken(ctx, c.ClientID, c.ClientSecret, c.Endpoint.TokenURL, v)
+	tk, err := internal.RetrieveToken(ctx, tokenURL, v)
 	if err != nil {
 		if rErr, ok := err.(*internal.RetrieveError); ok {
 			return nil, (*RetrieveError)(rErr)

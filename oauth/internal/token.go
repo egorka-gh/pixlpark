@@ -7,7 +7,6 @@ package internal
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"golang.org/x/net/context/ctxhttp"
@@ -97,30 +95,39 @@ func (e *expirationTime) UnmarshalJSON(b []byte) error {
 }
 
 // newTokenRequest returns a new *http.Request to retrieve a new token
-// from tokenURL using the provided clientID, clientSecret, and POST
-// body parameters.
-//
-// inParams is whether the clientID & clientSecret should be encoded
-// as the POST body. An 'inParams' value of true means to send it in
-// the POST body (along with any values in v); false means to send it
-// in the Authorization header.
-func newTokenRequest(tokenURL, clientID, clientSecret string, v url.Values, authStyle AuthStyle) (*http.Request, error) {
-	if authStyle == AuthStyleInParams {
-		v = cloneURLValues(v)
-		if clientID != "" {
-			v.Set("client_id", clientID)
+// from tokenURL using the provided parameters.
+// unlike oauth use GET request
+func newTokenRequest(tokenURL string, v url.Values) (*http.Request, error) {
+
+	/*
+		if authStyle == AuthStyleInParams {
+			v = cloneURLValues(v)
+			if clientID != "" {
+				v.Set("client_id", clientID)
+			}
+			if clientSecret != "" {
+				v.Set("client_secret", clientSecret)
+			}
 		}
-		if clientSecret != "" {
-			v.Set("client_secret", clientSecret)
+		req, err := http.NewRequest("POST", tokenURL, strings.NewReader(v.Encode()))
+		if err != nil {
+			return nil, err
 		}
-	}
-	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(v.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if authStyle == AuthStyleInHeader {
+			req.SetBasicAuth(url.QueryEscape(clientID), url.QueryEscape(clientSecret))
+		}
+		return req, nil
+	*/
+	req, err := http.NewRequest("GET", tokenURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if authStyle == AuthStyleInHeader {
-		req.SetBasicAuth(url.QueryEscape(clientID), url.QueryEscape(clientSecret))
+	if v != nil {
+		// need??
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		//TODO this replace query, if url has some - rewrite to add
+		req.URL.RawQuery = v.Encode()
 	}
 	return req, nil
 }
@@ -133,41 +140,13 @@ func cloneURLValues(v url.Values) url.Values {
 	return v2
 }
 
+//RetrieveToken makes doTokenRoundTrip
 func RetrieveToken(ctx context.Context, tokenURL string, v url.Values) (*Token, error) {
-	needsAuthStyleProbe := authStyle == 0
-	if needsAuthStyleProbe {
-		if style, ok := lookupAuthStyle(tokenURL); ok {
-			authStyle = style
-			needsAuthStyleProbe = false
-		} else {
-			authStyle = AuthStyleInHeader // the first way we'll try
-		}
-	}
-	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
+	req, err := newTokenRequest(tokenURL, v)
 	if err != nil {
 		return nil, err
 	}
 	token, err := doTokenRoundTrip(ctx, req)
-	if err != nil && needsAuthStyleProbe {
-		// If we get an error, assume the server wants the
-		// clientID & clientSecret in a different form.
-		// See https://code.google.com/p/goauth2/issues/detail?id=31 for background.
-		// In summary:
-		// - Reddit only accepts client secret in the Authorization header
-		// - Dropbox accepts either it in URL param or Auth header, but not both.
-		// - Google only accepts URL param (not spec compliant?), not Auth header
-		// - Stripe only accepts client secret in Auth header with Bearer method, not Basic
-		//
-		// We used to maintain a big table in this code of all the sites and which way
-		// they went, but maintaining it didn't scale & got annoying.
-		// So just try both ways.
-		authStyle = AuthStyleInParams // the second way we'll try
-		req, _ = newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
-		token, err = doTokenRoundTrip(ctx, req)
-	}
-	if needsAuthStyleProbe && err == nil {
-		setAuthStyle(tokenURL, authStyle)
-	}
 	// Don't overwrite `RefreshToken` with an empty value
 	// if this was a token refreshing request.
 	if token != nil && token.RefreshToken == "" {
@@ -184,7 +163,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	r.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
+		return nil, fmt.Errorf("oauth: cannot fetch token: %v", err)
 	}
 	if code := r.StatusCode; code < 200 || code > 299 {
 		return nil, &RetrieveError{
@@ -194,6 +173,7 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 	}
 
 	var token *Token
+	//TODO remove urlencoded, expected JSON
 	content, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	switch content {
 	case "application/x-www-form-urlencoded", "text/plain":
@@ -218,25 +198,29 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 			return nil, err
 		}
 		token = &Token{
+			RequestToken: tj.RequestToken,
 			AccessToken:  tj.AccessToken,
-			TokenType:    tj.TokenType,
+			TokenType:    "",
 			RefreshToken: tj.RefreshToken,
 			Expiry:       tj.expiry(),
 			Raw:          make(map[string]interface{}),
 		}
 		json.Unmarshal(body, &token.Raw) // no error checks for optional fields
 	}
-	if token.AccessToken == "" {
-		return nil, errors.New("oauth2: server response missing access_token")
-	}
+	/*
+		if token.AccessToken == "" && token.RequestToken == "" {
+			return nil, errors.New("oauth: server response missing access_token")
+		}
+	*/
 	return token, nil
 }
 
+//RetrieveError struct to get err
 type RetrieveError struct {
 	Response *http.Response
 	Body     []byte
 }
 
 func (r *RetrieveError) Error() string {
-	return fmt.Sprintf("oauth2: cannot fetch token: %v\nResponse: %s", r.Response.Status, r.Body)
+	return fmt.Sprintf("oauth: cannot fetch token: %v\nResponse: %s", r.Response.Status, r.Body)
 }

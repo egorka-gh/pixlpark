@@ -123,20 +123,31 @@ func (c *Config) AuthCodeURL(state string, opts ...AuthCodeOption) string {
 // The provided context optionally controls which HTTP client is used. See the HTTPClient variable.
 func (c *Config) PasswordCredentialsToken(ctx context.Context) (*Token, error) {
 	//get requestToken (simplified code obtaining)
-	tk, err := retrieveToken(ctx, c, c.Endpoint.RequestURL, url.Values)
+	tk, err := retrieveToken(ctx, c, c.Endpoint.RequestURL, url.Values{})
 	if err != nil {
 		return nil, err
 	}
-	requestToken := tk.AccessToken
+	if tk.RequestToken == "" {
+		return nil, errors.New("oauth: server response missing RequestToken")
+	}
 
 	//get access token
 	v := url.Values{
-		"oauth_token": {requestToken},
+		"oauth_token": {tk.RequestToken},
 		"grant_type":  {"api"},
 		"username":    {c.PublicKey},
-		"password":    {c.genPassword(requestToken)},
+		"password":    {c.genPassword(tk.RequestToken)},
 	}
-	return retrieveToken(ctx, c, c.Endpoint.TokenURL, v)
+
+	t, err := retrieveToken(ctx, c, c.Endpoint.TokenURL, v)
+	if err != nil {
+		return nil, err
+	}
+	if t.AccessToken == "" {
+		return nil, errors.New("oauth: server response missing AccessToken")
+	}
+	t.RequestToken = tk.RequestToken
+	return t, nil
 }
 
 func (c *Config) genPassword(requestToken string) string {
@@ -192,17 +203,64 @@ func (c *Config) Client(ctx context.Context, t *Token) *http.Client {
 //
 // Most users will use Config.Client instead.
 func (c *Config) TokenSource(ctx context.Context, t *Token) TokenSource {
+	tkf := &tokenFetcher{
+		ctx:  ctx,
+		conf: c,
+	}
 	tkr := &tokenRefresher{
 		ctx:  ctx,
 		conf: c,
 	}
 	if t != nil {
+		tkf.requestToken = t.RequestToken
 		tkr.refreshToken = t.RefreshToken
 	}
 	return &reuseTokenSource{
-		t:   t,
-		new: tkr,
+		t:         t,
+		refresher: tkr,
+		fetcher:   tkf,
 	}
+}
+
+// tokenFetcher is a TokenSource that fetch new access/refresh token  using public and private key
+// gets request token (if not already has it) and then new access/refresh token pair
+type tokenFetcher struct {
+	ctx          context.Context // used to get HTTP requests
+	conf         *Config
+	requestToken string
+}
+
+func (tf *tokenFetcher) Token() (*Token, error) {
+	//same as PasswordCredentialsToken
+	if tf.requestToken == "" {
+		//get requestToken (simplified code obtaining)
+		tk, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.RequestURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		if tk.RequestToken == "" {
+			return nil, errors.New("oauth: server response missing RequestToken")
+		}
+		tf.requestToken = tk.RequestToken
+	}
+
+	//get access token
+	v := url.Values{
+		"oauth_token": {tf.requestToken},
+		"grant_type":  {"api"},
+		"username":    {tf.conf.PublicKey},
+		"password":    {tf.conf.genPassword(tf.requestToken)},
+	}
+
+	t, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.TokenURL, v)
+	if err != nil {
+		return nil, err
+	}
+	if t.AccessToken == "" {
+		return nil, errors.New("oauth: server response missing AccessToken")
+	}
+	return t, nil
+
 }
 
 // tokenRefresher is a TokenSource that makes "grant_type"=="refresh_token"
@@ -222,7 +280,7 @@ func (tf *tokenRefresher) Token() (*Token, error) {
 		return nil, errors.New("oauth: token expired and refresh token is not set")
 	}
 
-	tk, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.RefreshURL url.Values{
+	tk, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.RefreshURL, url.Values{
 		"refreshToken": {tf.refreshToken},
 	})
 
@@ -240,7 +298,8 @@ func (tf *tokenRefresher) Token() (*Token, error) {
 // Token. If it's expired, it will be auto-refreshed using the
 // new TokenSource.
 type reuseTokenSource struct {
-	new TokenSource // called when t is expired.
+	fetcher   TokenSource // called when t nil or t refresh token is expired.
+	refresher TokenSource // called when t is access token expired.
 
 	mu sync.Mutex // guards t
 	t  *Token
@@ -255,7 +314,15 @@ func (s *reuseTokenSource) Token() (*Token, error) {
 	if s.t.Valid() {
 		return s.t, nil
 	}
-	t, err := s.new.Token()
+	if s.t.CanRefresh() {
+		t, err := s.refresher.Token()
+		if err != nil {
+			return nil, err
+		}
+		s.t = t
+		return t, nil
+	}
+	t, err := s.fetcher.Token()
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +364,10 @@ func NewClient(ctx context.Context, src TokenSource) *http.Client {
 	if src == nil {
 		return internal.ContextClient(ctx)
 	}
+	//TODO add timeout??
+	//timeout := time.Duration(20 * time.Second)
 	return &http.Client{
+		//Timeout: timeout,
 		Transport: &Transport{
 			Base:   internal.ContextClient(ctx).Transport,
 			Source: ReuseTokenSource(nil, src),
@@ -326,10 +396,16 @@ func ReuseTokenSource(t *Token, src TokenSource) TokenSource {
 			// Just use it directly.
 			return rt
 		}
-		src = rt.new
+		return &reuseTokenSource{
+			t:         t,
+			refresher: rt.refresher,
+			fetcher:   rt.fetcher,
+		}
 	}
+
 	return &reuseTokenSource{
-		t:   t,
-		new: src,
+		t:         t,
+		refresher: src,
+		fetcher:   src,
 	}
 }
