@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/egorka-gh/pixlpark/oauth/internal"
+	"github.com/go-kit/kit/log"
 )
 
 // NoContext is the default context you should supply if not using
@@ -40,6 +41,8 @@ type Config struct {
 	// often available via site-specific packages, such as
 	// google.Endpoint or github.Endpoint.
 	Endpoint Endpoint
+
+	Logger log.Logger
 }
 
 // A TokenSource is anything that can return a token.
@@ -219,6 +222,7 @@ func (c *Config) TokenSource(ctx context.Context, t *Token) TokenSource {
 		t:         t,
 		refresher: tkr,
 		fetcher:   tkf,
+		logger:    c.Logger,
 	}
 }
 
@@ -234,6 +238,8 @@ func (tf *tokenFetcher) Token() (*Token, error) {
 	//same as PasswordCredentialsToken
 	if tf.requestToken == "" {
 		//get requestToken (simplified code obtaining)
+		tf.conf.Logger.Log("tokenFetcher", "trying to get RequestToken")
+
 		tk, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.RequestURL, nil)
 		if err != nil {
 			return nil, err
@@ -241,6 +247,7 @@ func (tf *tokenFetcher) Token() (*Token, error) {
 		if tk.RequestToken == "" {
 			return nil, errors.New("oauth: server response missing RequestToken")
 		}
+		tf.conf.Logger.Log("RequestToken", tk.RequestToken)
 		tf.requestToken = tk.RequestToken
 	}
 
@@ -306,6 +313,7 @@ func (tf *tokenRefresher) SetRefreshToken(newToken string) {
 type reuseTokenSource struct {
 	fetcher   TokenSource // called when t nil or t refresh token is expired.
 	refresher TokenSource // called when t is access token expired.
+	logger    log.Logger
 
 	mu sync.Mutex // guards t
 	t  *Token
@@ -318,10 +326,12 @@ func (s *reuseTokenSource) Token() (*Token, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.t.Valid() {
+		s.logger.Log("reuseTokenSource", "Token still valid")
 		return s.t, nil
 	}
 	if s.t.CanRefresh() {
 		//refresh token
+		s.logger.Log("reuseTokenSource", "Trying to refresh Token")
 		t, err := s.refresher.Token()
 		if err != nil {
 			return nil, err
@@ -330,6 +340,7 @@ func (s *reuseTokenSource) Token() (*Token, error) {
 		return t, nil
 	}
 	//get new token
+	s.logger.Log("reuseTokenSource", "Trying to fetch Token")
 	t, err := s.fetcher.Token()
 	if err != nil {
 		return nil, err
@@ -412,6 +423,7 @@ func ReuseTokenSource(t *Token, src TokenSource) TokenSource {
 			t:         t,
 			refresher: rt.refresher,
 			fetcher:   rt.fetcher,
+			logger:    rt.logger,
 		}
 	}
 
