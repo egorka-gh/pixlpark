@@ -16,15 +16,15 @@ import (
 	"github.com/egorka-gh/pixlpark/oauth/internal"
 )
 
-// expiryDelta determines how earlier a token should be considered
+// expiryDelta determines how earlier a refreshtoken should be considered
 // expired than its actual expiration time. It is used to avoid late
 // expirations due to client-server time mismatches.
 const expiryDelta = 10 * time.Second
 
-// accessExpiryDelta determines how earlier a token should be considered
-// expired than its actual expiration time. It is used to avoid late
-// expirations due to client-server time mismatches.
-const accessExpiryDelta = 40 * time.Second
+// accessExpiryDelta determines how earlier a accesstoken should be considered expired.
+// accesstoken should expire before refresh token so it must be > expiryDelta
+//
+const accessExpiryDelta = 60 * time.Second
 
 // Token represents the credentials used to authorize
 // the requests to access protected resources on the OAuth 2.0
@@ -146,7 +146,7 @@ func (t *Token) expired() bool {
 	if t.Expiry.IsZero() {
 		return true
 	}
-	return t.Expiry.Round(0).Add(-expiryDelta - accessExpiryDelta).Before(timeNow())
+	return t.Expiry.Round(0).Add(-accessExpiryDelta).Before(timeNow())
 }
 
 // refreshExpired reports whether the refresh token is expired.

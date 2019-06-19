@@ -15,9 +15,9 @@ func TestTokenAccessExpiry(t *testing.T) {
 		tok  *Token
 		want bool
 	}{
-		{name: "12 seconds", tok: &Token{Expiry: now.Add(12*time.Second + accessExpiryDelta)}, want: false},
-		{name: "10 seconds", tok: &Token{Expiry: now.Add(expiryDelta + accessExpiryDelta)}, want: false},
-		{name: "10 seconds-1ns", tok: &Token{Expiry: now.Add(expiryDelta + accessExpiryDelta - 1*time.Nanosecond)}, want: true},
+		{name: "12 seconds", tok: &Token{Expiry: now.Add(1*time.Second + accessExpiryDelta)}, want: false},
+		{name: "10 seconds", tok: &Token{Expiry: now.Add(accessExpiryDelta)}, want: false},
+		{name: "10 seconds-1ns", tok: &Token{Expiry: now.Add(accessExpiryDelta - 1*time.Nanosecond)}, want: true},
 		{name: "-1 hour", tok: &Token{Expiry: now.Add(-1 * time.Hour)}, want: true},
 	}
 	for _, tc := range cases {
@@ -37,7 +37,7 @@ func TestTokenRefreshExpiry(t *testing.T) {
 		tok  *Token
 		want bool
 	}{
-		{name: "12 seconds", tok: &Token{Expiry: now.Add(12 * time.Second)}, want: false},
+		{name: "12 seconds", tok: &Token{Expiry: now.Add(1*time.Second + expiryDelta)}, want: false},
 		{name: "10 seconds", tok: &Token{Expiry: now.Add(expiryDelta)}, want: false},
 		{name: "10 seconds-1ns", tok: &Token{Expiry: now.Add(expiryDelta - 1*time.Nanosecond)}, want: true},
 		{name: "-1 hour", tok: &Token{Expiry: now.Add(-1 * time.Hour)}, want: true},
