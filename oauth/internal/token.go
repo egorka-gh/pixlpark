@@ -7,14 +7,13 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"math"
-	"mime"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"golang.org/x/net/context/ctxhttp"
@@ -51,9 +50,8 @@ type Token struct {
 	// mechanisms for that TokenSource will not be used.
 	Expiry time.Time
 
-	// Raw optionally contains extra metadata from the server
-	// when updating a token.
-	Raw interface{}
+	//RawBody is unparsed body
+	RawBody string
 }
 
 // tokenJSON is the struct representing the HTTP response from OAuth2
@@ -63,6 +61,8 @@ type tokenJSON struct {
 	AccessToken  string         `json:"AccessToken"`
 	RefreshToken string         `json:"RefreshToken"`
 	ExpiresIn    expirationTime `json:"Expires"` // at least PayPal returns string, while most return number
+	Success      bool           `json:"Success"`
+	Error        string         `json:"Error"`
 }
 
 func (e *tokenJSON) expiry() (t time.Time) {
@@ -98,27 +98,6 @@ func (e *expirationTime) UnmarshalJSON(b []byte) error {
 // from tokenURL using the provided parameters.
 // unlike oauth use GET request
 func newTokenRequest(tokenURL string, v url.Values) (*http.Request, error) {
-
-	/*
-		if authStyle == AuthStyleInParams {
-			v = cloneURLValues(v)
-			if clientID != "" {
-				v.Set("client_id", clientID)
-			}
-			if clientSecret != "" {
-				v.Set("client_secret", clientSecret)
-			}
-		}
-		req, err := http.NewRequest("POST", tokenURL, strings.NewReader(v.Encode()))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		if authStyle == AuthStyleInHeader {
-			req.SetBasicAuth(url.QueryEscape(clientID), url.QueryEscape(clientSecret))
-		}
-		return req, nil
-	*/
 	req, err := http.NewRequest("GET", tokenURL, nil)
 	if err != nil {
 		return nil, err
@@ -147,11 +126,13 @@ func RetrieveToken(ctx context.Context, tokenURL string, v url.Values) (*Token, 
 		return nil, err
 	}
 	token, err := doTokenRoundTrip(ctx, req)
-	// Don't overwrite `RefreshToken` with an empty value
-	// if this was a token refreshing request.
-	if token != nil && token.RefreshToken == "" {
-		token.RefreshToken = v.Get("refresh_token")
-	}
+	/*
+		// Don't overwrite `RefreshToken` with an empty value
+		// if this was a token refreshing request.
+		if token != nil && token.RefreshToken == "" {
+			token.RefreshToken = v.Get("refresh_token")
+		}
+	*/
 	return token, err
 }
 
@@ -173,45 +154,27 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 	}
 
 	var token *Token
-	//TODO remove urlencoded, expected JSON
-	content, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	switch content {
-	case "application/x-www-form-urlencoded", "text/plain":
-		vals, err := url.ParseQuery(string(body))
-		if err != nil {
-			return nil, err
-		}
-		token = &Token{
-			AccessToken:  vals.Get("access_token"),
-			TokenType:    vals.Get("token_type"),
-			RefreshToken: vals.Get("refresh_token"),
-			Raw:          vals,
-		}
-		e := vals.Get("expires_in")
-		expires, _ := strconv.Atoi(e)
-		if expires != 0 {
-			token.Expiry = time.Now().Add(time.Duration(expires) * time.Second)
-		}
-	default:
-		var tj tokenJSON
-		if err = json.Unmarshal(body, &tj); err != nil {
-			return nil, err
-		}
-		token = &Token{
-			RequestToken: tj.RequestToken,
-			AccessToken:  tj.AccessToken,
-			TokenType:    "",
-			RefreshToken: tj.RefreshToken,
-			Expiry:       tj.expiry(),
-			Raw:          make(map[string]interface{}),
-		}
-		json.Unmarshal(body, &token.Raw) // no error checks for optional fields
+	var tj tokenJSON
+	if err = json.Unmarshal(body, &tj); err != nil {
+		return nil, err
 	}
-	/*
-		if token.AccessToken == "" && token.RequestToken == "" {
-			return nil, errors.New("oauth: server response missing access_token")
+	if tj.Success == false {
+		if tj.Error == "" {
+			err = errors.New("oauth: server response Success = false")
+		} else {
+			err = errors.New(tj.Error)
 		}
-	*/
+		return nil, err
+	}
+	token = &Token{
+		RequestToken: tj.RequestToken,
+		AccessToken:  tj.AccessToken,
+		TokenType:    "",
+		RefreshToken: tj.RefreshToken,
+		Expiry:       tj.expiry(),
+		RawBody:      string(body[:]),
+	}
+
 	return token, nil
 }
 

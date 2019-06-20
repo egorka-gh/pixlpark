@@ -235,21 +235,40 @@ type tokenFetcher struct {
 }
 
 func (tf *tokenFetcher) Token() (*Token, error) {
-	//same as PasswordCredentialsToken
-	if tf.requestToken == "" {
-		//get requestToken (simplified code obtaining)
-		tf.conf.Logger.Log("tokenFetcher", "trying to get RequestToken")
 
-		tk, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.RequestURL, nil)
-		if err != nil {
-			return nil, err
+	if tf.requestToken != "" {
+		//short trip
+		if tk, err := tf.getAccessToken(); err == nil {
+			return tk, nil
 		}
-		if tk.RequestToken == "" {
-			return nil, errors.New("oauth: server response missing RequestToken")
-		}
-		tf.conf.Logger.Log("RequestToken", tk.RequestToken)
-		tf.requestToken = tk.RequestToken
+		//something goes wrong, reset request token
+		tf.requestToken = ""
 	}
+	//full trip
+	if err := tf.getRequestToken(); err != nil {
+		return nil, err
+	}
+	return tf.getAccessToken()
+}
+
+func (tf *tokenFetcher) getRequestToken() error {
+	//get requestToken (simplified code obtaining)
+	tf.conf.Logger.Log("tokenFetcher", "trying to get RequestToken")
+
+	tk, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.RequestURL, url.Values{})
+	if err != nil {
+		return err
+	}
+	if tk.RequestToken == "" {
+		return errors.New("oauth: server response missing RequestToken")
+	}
+	tf.conf.Logger.Log("RequestToken", tk.RequestToken)
+	tf.requestToken = tk.RequestToken
+	return nil
+}
+
+func (tf *tokenFetcher) getAccessToken() (*Token, error) {
+	tf.conf.Logger.Log("tokenFetcher", "trying to get AccessToken")
 
 	//get access token
 	v := url.Values{
@@ -267,7 +286,6 @@ func (tf *tokenFetcher) Token() (*Token, error) {
 		return nil, errors.New("oauth: server response missing AccessToken")
 	}
 	return t, nil
-
 }
 
 // tokenRefresher is a TokenSource that makes "grant_type"=="refresh_token"
@@ -322,9 +340,17 @@ type reuseTokenSource struct {
 // Token returns the current token if it's still valid, else will
 // refresh the current token (using r.Context for HTTP client
 // information) and return the new one.
-func (s *reuseTokenSource) Token() (*Token, error) {
+func (s *reuseTokenSource) Token() (tk *Token, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer func() {
+		if tk != nil {
+			s.logger.Log("reuseTokenSource.Token()", tk.rawBody)
+		}
+		if err != nil {
+			s.logger.Log("reuseTokenSource err", err.Error())
+		}
+	}()
 	if s.t.Valid() {
 		s.logger.Log("reuseTokenSource", "Token still valid")
 		return s.t, nil
@@ -332,12 +358,11 @@ func (s *reuseTokenSource) Token() (*Token, error) {
 	if s.t.CanRefresh() {
 		//refresh token
 		s.logger.Log("reuseTokenSource", "Trying to refresh Token")
-		t, err := s.refresher.Token()
-		if err != nil {
-			return nil, err
+		if t, err := s.refresher.Token(); err == nil {
+			s.t = t
+			return t, nil
 		}
-		s.t = t
-		return t, nil
+		//something goes wrong, keep going
 	}
 	//get new token
 	s.logger.Log("reuseTokenSource", "Trying to fetch Token")

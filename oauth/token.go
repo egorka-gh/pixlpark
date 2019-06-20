@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -57,9 +56,7 @@ type Token struct {
 	// If zero, TokenSource consider expired and not valid
 	Expiry time.Time `json:"Expires,omitempty"`
 
-	// raw optionally contains extra metadata from the server
-	// when updating a token.
-	raw interface{}
+	rawBody string
 }
 
 // Type returns t.TokenType if non-empty, else "Bearer".
@@ -97,44 +94,6 @@ func (t *Token) SetAuthURLParametr(r *http.Request) {
 	q := r.URL.Query()
 	q.Add("oauth_token", t.AccessToken)
 	r.URL.RawQuery = q.Encode()
-}
-
-// WithExtra returns a new Token that's a clone of t, but using the
-// provided raw extra map. This is only intended for use by packages
-// implementing derivative OAuth2 flows.
-func (t *Token) WithExtra(extra interface{}) *Token {
-	t2 := new(Token)
-	*t2 = *t
-	t2.raw = extra
-	return t2
-}
-
-// Extra returns an extra field.
-// Extra fields are key-value pairs returned by the server as a
-// part of the token retrieval response.
-func (t *Token) Extra(key string) interface{} {
-	if raw, ok := t.raw.(map[string]interface{}); ok {
-		return raw[key]
-	}
-
-	vals, ok := t.raw.(url.Values)
-	if !ok {
-		return nil
-	}
-
-	v := vals.Get(key)
-	switch s := strings.TrimSpace(v); strings.Count(s, ".") {
-	case 0: // Contains no "."; try to parse as int
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i
-		}
-	case 1: // Contains a single "."; try to parse as float
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return f
-		}
-	}
-
-	return v
 }
 
 // timeNow is time.Now but pulled out as a variable for tests.
@@ -181,7 +140,7 @@ func tokenFromInternal(t *internal.Token) *Token {
 		TokenType:    t.TokenType,
 		RefreshToken: t.RefreshToken,
 		Expiry:       t.Expiry,
-		raw:          t.Raw,
+		rawBody:      t.RawBody,
 	}
 }
 
@@ -189,6 +148,7 @@ func tokenFromInternal(t *internal.Token) *Token {
 // This token is then mapped from *internal.Token into an *oauth2.Token which is returned along
 // with an error..
 func retrieveToken(ctx context.Context, c *Config, tokenURL string, v url.Values) (*Token, error) {
+	c.Logger.Log("token url", tokenURL, "query", v.Encode())
 	tk, err := internal.RetrieveToken(ctx, tokenURL, v)
 	if err != nil {
 		if rErr, ok := err.(*internal.RetrieveError); ok {

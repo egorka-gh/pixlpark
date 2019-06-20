@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
@@ -46,12 +45,15 @@ func main() {
 				//calls vsout refresh
 				r, err := c.Get(url)
 				if err != nil {
-					fmt.Println("Error fetching ", err.Error())
+					cnf.Logger.Log("fetching error", err.Error())
 				}
-				fmt.Println("Responce: ")
-				io.Copy(os.Stdout, r.Body)
+				bodyBytes, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					cnf.Logger.Log("fetching error", err.Error())
+				}
+				cnf.Logger.Log("Responce", string(bodyBytes))
+				//io.Copy(os.Stdout, r.Body)
 				r.Body.Close()
-				fmt.Println()
 			} else {
 				//alive = false
 				//waite till can refresh
