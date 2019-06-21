@@ -27,6 +27,7 @@ func main() {
 	}
 
 	url := "http://api.pixlpark.com/orders/count"
+	//url := "http://api.pixlpark.com"
 	c := cnf.Client(context.Background(), nil)
 
 	ticker := time.NewTicker(10 * time.Second)
