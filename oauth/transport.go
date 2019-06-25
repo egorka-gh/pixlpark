@@ -56,7 +56,20 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	token.SetAuthURLParametr(req2)
 	t.setModReq(req, req2)
 	res, err := t.base().RoundTrip(req2)
-	//TODO in case 401 respose reset t.Source and do trip again??
+
+	//in case 401 respose reset t.Source and do trip again??
+	//TODO write test
+	if res.StatusCode == 401 {
+		t.Source.Reset()
+		token, err = t.Source.Token()
+		if err != nil {
+			return nil, err
+		}
+		req2 = cloneRequest(req) // per RoundTripper contract
+		token.SetAuthURLParametr(req2)
+		t.setModReq(req, req2)
+		res, err = t.base().RoundTrip(req2)
+	}
 
 	// req.Body is assumed to have been closed by the base RoundTripper.
 	reqBodyClosed = true

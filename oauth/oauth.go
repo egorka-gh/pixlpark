@@ -394,6 +394,7 @@ func (s *reuseTokenSource) Token() (tk *Token, err error) {
 func (s *reuseTokenSource) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.logger.Log("reuseTokenSource", "Reset")
 	s.t = nil
 	s.fetcher.Reset()
 	s.refresher.Reset()
