@@ -51,6 +51,10 @@ type TokenSource interface {
 	// Token must be safe for concurrent use by multiple goroutines.
 	// The returned Token must not be modified.
 	Token() (*Token, error)
+
+	//Reset source, make all token's invalid
+	//next Token() call makes full fetch
+	Reset()
 }
 
 // Endpoint represents an OAuth 2.0 provider's authorization and token
@@ -251,6 +255,10 @@ func (tf *tokenFetcher) Token() (*Token, error) {
 	return tf.getAccessToken()
 }
 
+func (tf *tokenFetcher) Reset() {
+	tf.requestToken = ""
+}
+
 func (tf *tokenFetcher) getRequestToken() error {
 	//get requestToken (simplified code obtaining)
 	tf.conf.Logger.Log("tokenFetcher", "trying to get RequestToken")
@@ -324,13 +332,17 @@ func (tf *tokenRefresher) SetRefreshToken(newToken string) {
 	}
 }
 
+func (tf *tokenRefresher) Reset() {
+	//noop
+}
+
 // reuseTokenSource is a TokenSource that holds a single token in memory
 // and validates its expiry before each call to retrieve it with
 // Token. If it's expired, it will be auto-refreshed using the
 // new TokenSource.
 type reuseTokenSource struct {
 	fetcher   TokenSource // called when t nil or t refresh token is expired.
-	refresher TokenSource // called when t is access token expired.
+	refresher TokenSource // called when is access token expired.
 	logger    log.Logger
 
 	mu sync.Mutex // guards t
@@ -378,6 +390,15 @@ func (s *reuseTokenSource) Token() (tk *Token, err error) {
 	return t, nil
 }
 
+//Reset set token = nil  and clear request token
+func (s *reuseTokenSource) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.t = nil
+	s.fetcher.Reset()
+	s.refresher.Reset()
+}
+
 // StaticTokenSource returns a TokenSource that always returns the same token.
 // Because the provided token t is never refreshed, StaticTokenSource is only
 // useful for tokens that never expire.
@@ -392,6 +413,10 @@ type staticTokenSource struct {
 
 func (s staticTokenSource) Token() (*Token, error) {
 	return s.t, nil
+}
+
+func (s staticTokenSource) Reset() {
+	//noop
 }
 
 // HTTPClient is the context key to use with golang.org/x/net/context's
