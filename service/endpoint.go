@@ -2,11 +2,9 @@ package service
 
 import (
 	"context"
-	"net/url"
-	"strings"
+	"fmt"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/transport/http"
 )
 
 // Endpoints collects all of the endpoints that compose a profile service. It's
@@ -28,43 +26,48 @@ func New(s service.ZsyncService, mdw map[string][]endpoint.Middleware) Endpoints
 }
 */
 
-// GetLevel implements Service. Primarily useful in a client.
-func (e Endpoints) CountOrders(ctx context.Context, statuses []string) (i0 int, e1 error) {
-	/*
-		request := GetLevelRequest{Card: card}
-		response, err := e.GetLevelEndpoint(ctx, request)
-		if err != nil {
-			return
-		}
-		return response.(GetLevelResponse).I0, response.(GetLevelResponse).E1
-	*/
-	return 10, nil
+//common fields in service responce
+type basePPResponse struct {
+	APIVersion   string `json:"ApiVersion"`
+	ResponseCode int    `json:"ResponseCode"`
 }
 
-// New returns an PPService backed by an HTTP server living at the remote
-// instance. We expect instance to come from a service discovery system, so
-// likely of the form "host:port".
-func New(instance string, options map[string][]http.ClientOption) (PPService, error) {
-	if !strings.HasPrefix(instance, "http") {
-		instance = "http://" + instance
+func (b basePPResponse) checAPIVersion() error {
+	if b.APIVersion != APIVersion {
+		return fmt.Errorf("Wrong API version. Expected %s. Got %s", APIVersion, b.APIVersion)
 	}
-	u, err := url.Parse(instance)
+	return nil
+}
+
+// CountOrdersRequest collects the request parameters for the CountOrders method.
+type CountOrdersRequest struct {
+	Statuses []string
+}
+
+// CountOrders is CountOrdersResponse Result item
+type CountOrders struct {
+	Count int `json:"count"`
+}
+
+// CountOrdersResponse collects the response parameters for the CountOrders method.
+type CountOrdersResponse struct {
+	basePPResponse
+	Result []CountOrders `json:"Result"`
+}
+
+// CountOrders implements Service. Primarily useful in a client.
+func (e Endpoints) CountOrders(ctx context.Context, statuses []string) (count int, err error) {
+	request := CountOrdersRequest{Statuses: statuses}
+	response, err := e.CountOrdersEndpoint(ctx, request)
 	if err != nil {
-		return nil, err
+		return
 	}
-	var countOrdersEndpoint endpoint.Endpoint
-	{
-		//countOrdersEndpoint = http.NewClient("POST", copyURL(u, "/list-version"), encodeHTTPGenericRequest, decodeListVersionResponse, options["ListVersion"]...).Endpoint()
+	resp := response.(CountOrdersResponse)
+	if err = resp.checAPIVersion(); err != nil {
+		return
 	}
-
-	return Endpoints{
-		CountOrdersEndpoint: countOrdersEndpoint,
-	}, nil
-}
-
-func copyURL(base *url.URL, path string) (next *url.URL) {
-	n := *base
-	n.Path = path
-	next = &n
-	return
+	if len(resp.Result) != 1 {
+		return 0, fmt.Errorf("Wrong Result len. Expected 1 item. Got %d", len(resp.Result))
+	}
+	return resp.Result[0].Count, nil
 }

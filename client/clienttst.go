@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/egorka-gh/pixlpark/oauth"
+	"github.com/egorka-gh/pixlpark/service"
 	log "github.com/go-kit/kit/log"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
@@ -26,9 +26,10 @@ func main() {
 		Logger: initLoger(""),
 	}
 
-	url := "http://api.pixlpark.com/orders/count"
-	//url := "http://api.pixlpark.com"
-	c := cnf.Client(context.Background(), nil)
+	//url := "http://api.pixlpark.com/orders/count"
+	url := "http://api.pixlpark.com"
+	oauthClient := cnf.Client(context.Background(), nil)
+	ttClient, _ := service.New(url, defaultHttpOptions(oauthClient, cnf.Logger))
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -44,17 +45,21 @@ func main() {
 			calls++
 			if calls < 3 {
 				//calls vsout refresh
-				r, err := c.Get(url)
+				//r, err := c.Get(url)
+				count, err := ttClient.CountOrders(context.Background(), []string{})
 				if err != nil {
-					cnf.Logger.Log("fetching error", err.Error())
+					cnf.Logger.Log("CountOrders error", err.Error())
 				}
-				bodyBytes, err := ioutil.ReadAll(r.Body)
-				if err != nil {
-					cnf.Logger.Log("fetching error", err.Error())
-				}
-				cnf.Logger.Log("Responce", string(bodyBytes))
-				//io.Copy(os.Stdout, r.Body)
-				r.Body.Close()
+				/*
+					bodyBytes, err := ioutil.ReadAll(r.Body)
+					if err != nil {
+						cnf.Logger.Log("fetching error", err.Error())
+					}
+					cnf.Logger.Log("Responce", string(bodyBytes))
+					//io.Copy(os.Stdout, r.Body)
+					r.Body.Close()
+				*/
+				cnf.Logger.Log("Responce", count)
 			} else {
 				//alive = false
 				//waite till can refresh
