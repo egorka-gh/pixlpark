@@ -202,6 +202,9 @@ func (c *Config) Exchange(ctx context.Context, code string, opts ...AuthCodeOpti
 // HTTP transport will be obtained using the provided context.
 // The returned client and its Transport should not be modified.
 func (c *Config) Client(ctx context.Context, t *Token) *http.Client {
+	if c.Logger == nil {
+		c.Logger = log.NewNopLogger()
+	}
 	return NewClient(ctx, c.TokenSource(ctx, t))
 }
 

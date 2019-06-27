@@ -2,28 +2,88 @@ package main
 
 import (
 	"context"
+	"fmt"
 	http0 "net/http"
+	"time"
 
+	"github.com/go-kit/kit/endpoint"
 	log "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/transport/http"
 )
 
-func defaultHttpOptions(cli *http0.Client, logger log.Logger) map[string][]http.ClientOption {
+var methods = []string{"CountOrders", "dummi"}
+
+func defaultHTTPOptions(cli *http0.Client, logger log.Logger) map[string][]http.ClientOption {
 	//cli := defaultHttpClient()
-	options := map[string][]http.ClientOption{
-		"CountOrders": {http.SetClient(cli)},
-		/*
-			"AddActivity": {http.SetClient(cli), clientFinalizer("AddActivity", logger)},
-			"GetLevel":    {http.SetClient(cli), clientFinalizer("GetLevel", logger)},
-			"ListVersion": {http.SetClient(cli), clientFinalizer("ListVersion", logger)},
-			"PackDone":    {http.SetClient(cli), clientFinalizer("PackDone", logger)},
-			"PullPack":    {http.SetClient(cli), clientFinalizer("PullPack", logger)},
-			"PushPack":    {http.SetClient(cli), clientFinalizer("PushPack", logger)},
-		*/
+	options := map[string][]http.ClientOption{}
+	for _, v := range methods {
+		options[v] = append(options[v], http.SetClient(cli))
+		if logger != nil {
+			options[v] = append(options[v], beforeURILogger(log.With(logger, "method", v)))
+		}
 	}
+
+	//"CountOrders": {http.SetClient(cli), beforeURIExtractor()},
+	/*
+		"AddActivity": {http.SetClient(cli), clientFinalizer("AddActivity", logger)},
+		"GetLevel":    {http.SetClient(cli), clientFinalizer("GetLevel", logger)},
+		"ListVersion": {http.SetClient(cli), clientFinalizer("ListVersion", logger)},
+		"PackDone":    {http.SetClient(cli), clientFinalizer("PackDone", logger)},
+		"PullPack":    {http.SetClient(cli), clientFinalizer("PullPack", logger)},
+		"PushPack":    {http.SetClient(cli), clientFinalizer("PushPack", logger)},
+	*/
+
 	return options
 }
 
+func defaultHTTPMiddleware(logger log.Logger) (mw map[string][]endpoint.Middleware) {
+	mw = map[string][]endpoint.Middleware{}
+
+	for _, v := range methods {
+		mw[v] = append(mw[v], loggingMiddlware(log.With(logger, "method", v)))
+	}
+	return
+}
+
+func beforeURILogger(l log.Logger) http.ClientOption {
+	return http.ClientBefore(
+		func(ctx context.Context, r *http0.Request) context.Context {
+			l.Log("uri", r.URL.RequestURI())
+			return ctx
+		},
+	)
+}
+
+func loggingMiddlware(l log.Logger) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request interface{}) (result interface{}, err error) {
+			var req, resp string
+
+			defer func(b time.Time) {
+				l.Log(
+					"request", req,
+					"result", resp,
+					"err", err,
+					"elapsed", time.Since(b),
+				)
+			}(time.Now())
+			if r, ok := request.(fmt.Stringer); ok {
+				req = r.String()
+			} else {
+				req = fmt.Sprintf("%+v", request)
+			}
+			result, err = next(ctx, request)
+			if r, ok := result.(fmt.Stringer); ok {
+				resp = r.String()
+			} else {
+				resp = fmt.Sprintf("%+v", result)
+			}
+			return
+		}
+	}
+}
+
+/*
 //TODO refactor or remove
 func clientFinalizer(method string, logger log.Logger) http.ClientOption {
 	lg := log.With(logger, "method", method)
@@ -36,7 +96,7 @@ func clientFinalizer(method string, logger log.Logger) http.ClientOption {
 	)
 }
 
-/*
+
 //TODO create oauth client
 //creates transient client, can be pooled?
 func defaultHttpClient() *http0.Client {

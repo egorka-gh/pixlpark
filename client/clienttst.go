@@ -15,6 +15,7 @@ import (
 
 func main() {
 
+	logger := initLoger("")
 	cnf := &oauth.Config{
 		PublicKey:  "2ef2d5233fcc49bba387a51aabefb678",
 		PrivateKey: "24a1aad1c8364d87ae1dde60c8be6dbc",
@@ -23,13 +24,13 @@ func main() {
 			RefreshURL: "http://api.pixlpark.com/oauth/refreshtoken",
 			TokenURL:   "http://api.pixlpark.com/oauth/accesstoken",
 		},
-		Logger: initLoger(""),
+		Logger: log.NewNopLogger(), // logger,
 	}
 
 	//url := "http://api.pixlpark.com/orders/count"
 	url := "http://api.pixlpark.com"
 	oauthClient := cnf.Client(context.Background(), nil)
-	ttClient, _ := service.New(url, defaultHttpOptions(oauthClient, cnf.Logger))
+	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -48,7 +49,7 @@ func main() {
 				//r, err := c.Get(url)
 				count, err := ttClient.CountOrders(context.Background(), []string{})
 				if err != nil {
-					cnf.Logger.Log("CountOrders error", err.Error())
+					logger.Log("CountOrders error", err.Error())
 				}
 				/*
 					bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -59,7 +60,7 @@ func main() {
 					//io.Copy(os.Stdout, r.Body)
 					r.Body.Close()
 				*/
-				cnf.Logger.Log("Responce", count)
+				logger.Log("Responce", count)
 			} else {
 				//alive = false
 				//waite till can refresh
