@@ -24,13 +24,14 @@ func main() {
 			RefreshURL: "http://api.pixlpark.com/oauth/refreshtoken",
 			TokenURL:   "http://api.pixlpark.com/oauth/accesstoken",
 		},
-		Logger: log.NewNopLogger(), // logger,
+		//Logger: logger,
 	}
 
 	//url := "http://api.pixlpark.com/orders/count"
 	url := "http://api.pixlpark.com"
 	oauthClient := cnf.Client(context.Background(), nil)
-	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
+	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
+	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()

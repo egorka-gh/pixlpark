@@ -148,7 +148,7 @@ func tokenFromInternal(t *internal.Token) *Token {
 // This token is then mapped from *internal.Token into an *oauth2.Token which is returned along
 // with an error..
 func retrieveToken(ctx context.Context, c *Config, tokenURL string, v url.Values) (*Token, error) {
-	c.Logger.Log("token url", tokenURL, "query", v.Encode())
+	c.Log("token url", tokenURL, "query", v.Encode())
 	tk, err := internal.RetrieveToken(ctx, tokenURL, v)
 	if err != nil {
 		if rErr, ok := err.(*internal.RetrieveError); ok {

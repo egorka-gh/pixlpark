@@ -202,10 +202,15 @@ func (c *Config) Exchange(ctx context.Context, code string, opts ...AuthCodeOpti
 // HTTP transport will be obtained using the provided context.
 // The returned client and its Transport should not be modified.
 func (c *Config) Client(ctx context.Context, t *Token) *http.Client {
-	if c.Logger == nil {
-		c.Logger = log.NewNopLogger()
-	}
 	return NewClient(ctx, c.TokenSource(ctx, t))
+}
+
+//Log wraps log.logger
+func (c *Config) Log(keyvals ...interface{}) error {
+	if c.Logger != nil {
+		return c.Logger.Log(keyvals...)
+	}
+	return nil
 }
 
 // TokenSource returns a TokenSource that returns t until t expires,
@@ -229,7 +234,7 @@ func (c *Config) TokenSource(ctx context.Context, t *Token) TokenSource {
 		t:         t,
 		refresher: tkr,
 		fetcher:   tkf,
-		logger:    c.Logger,
+		logger:    c,
 	}
 }
 
@@ -264,7 +269,7 @@ func (tf *tokenFetcher) Reset() {
 
 func (tf *tokenFetcher) getRequestToken() error {
 	//get requestToken (simplified code obtaining)
-	tf.conf.Logger.Log("tokenFetcher", "trying to get RequestToken")
+	tf.conf.Log("tokenFetcher", "trying to get RequestToken")
 
 	tk, err := retrieveToken(tf.ctx, tf.conf, tf.conf.Endpoint.RequestURL, url.Values{})
 	if err != nil {
@@ -273,13 +278,13 @@ func (tf *tokenFetcher) getRequestToken() error {
 	if tk.RequestToken == "" {
 		return errors.New("oauth: server response missing RequestToken")
 	}
-	tf.conf.Logger.Log("RequestToken", tk.RequestToken)
+	tf.conf.Log("RequestToken", tk.RequestToken)
 	tf.requestToken = tk.RequestToken
 	return nil
 }
 
 func (tf *tokenFetcher) getAccessToken() (*Token, error) {
-	tf.conf.Logger.Log("tokenFetcher", "trying to get AccessToken")
+	tf.conf.Log("tokenFetcher", "trying to get AccessToken")
 
 	//get access token
 	v := url.Values{
