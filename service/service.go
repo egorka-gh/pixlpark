@@ -40,7 +40,7 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	//get milisec
+	//get milisec??
 	t2, err := strconv.ParseInt(string(b[len(b)-(2+3):len(b)-2]), 10, 64)
 	if err != nil {
 		return err
