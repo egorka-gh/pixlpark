@@ -23,6 +23,7 @@ type Date time.Time
 
 //UnmarshalJSON  Unmarshal custom date format
 //TODO write test
+//TODO уточнить формат у PP
 func (d *Date) UnmarshalJSON(b []byte) error {
 	if len(b) == 0 || string(b) == "null" {
 		return nil
@@ -30,21 +31,22 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 	//expected format
 	//"/Date(1331083326130)/"
 	//check
-	if len(b) < 7 || string(b[0:6]) != "/Date(" || string(b[len(b)-2:len(b)]) != ")/" {
+	if len(b) < 11 || string(b[0:6]) != "/Date(" || string(b[len(b)-2:len(b)]) != ")/" {
 		//wrong format
 		return fmt.Errorf("Wrong date format in %s", string(b[:]))
 	}
-	//remove leading and trailing /
+	//get seconds
 	t1, err := strconv.ParseInt(string(b[6:len(b)-(2+3)]), 10, 64)
 	if err != nil {
 		return err
 	}
+	//get milisec
 	t2, err := strconv.ParseInt(string(b[len(b)-(2+3):len(b)-2]), 10, 64)
 	if err != nil {
 		return err
 	}
 
-	*d = Date(time.Unix(t1, t2).UTC())
+	*d = Date(time.Unix(t1, t2*1000).UTC())
 	return nil
 }
 
