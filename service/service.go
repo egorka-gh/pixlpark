@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -15,7 +16,7 @@ const APIVersion = "1.0"
 // PPService describes the pixlpark service.
 type PPService interface {
 	CountOrders(ctx context.Context, statuses []string) (int, error)
-	// GetOrders(ctx context.Context, statuses []string, userID, shippingID, take, skip int) (int, error)
+	GetOrders(ctx context.Context, status string, userID, shippingID, take, skip int) ([]Order, error)
 }
 
 //Date is time.Time, used to Unmarshal custom date format
@@ -28,8 +29,14 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 	if len(b) == 0 || string(b) == "null" {
 		return nil
 	}
+	//TODO escaped / "DateCreated":"\/Date(1564133280000)\/" ??
+	//unmarshal to string??
+	var s string
+	json.Unmarshal(b, &s)
+	b = []byte(s)
 	//expected format
 	//"/Date(1331083326130)/"
+	//"DateCreated": "/Date(1562920440000)/",
 	//check
 	if len(b) < 11 || string(b[0:6]) != "/Date(" || string(b[len(b)-2:len(b)]) != ")/" {
 		//wrong format
@@ -48,6 +55,11 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 
 	*d = Date(time.Unix(t1, t2*1000).UTC())
 	return nil
+}
+
+func (d Date) format(s string) string {
+	t := time.Time(d)
+	return t.Format(s)
 }
 
 // Order represent pp order
@@ -73,8 +85,8 @@ type Order struct {
 	PaidPrice       float64         `json:"PaidPrice"`
 	UserID          int             `json:"UserId"`
 	DiscountID      int             `json:"DiscountId"`
-	DateCreated     Date            `json:"DateCreated"`
-	DateModified    Date            `json:"DateModified"`
+	DateCreated     Date            `json:"DateCreated,string"`
+	DateModified    Date            `json:"DateModified,string"`
 }
 
 // DeliveryAddress represent pp DeliveryAddress
@@ -96,4 +108,31 @@ type Shipping struct {
 	Phone        string `json:"Phone"`
 	Email        string `json:"Email"`
 	ShippingType string `json:"ShippingType"`
+}
+
+// OrderItem represent pp Order Item
+type OrderItem struct {
+	ID               int               `json:"Id"`
+	OrderID          string            `json:"OrderId"`
+	Name             string            `json:"Name"`
+	Description      string            `json:"Description"`
+	Quantity         int               `json:"Quantity"`
+	ItemPrice        float64           `json:"ItemPrice"`
+	AdditionalPrice  float64           `json:"AdditionalPrice"`
+	CustomWorkPrice  float64           `json:"CustomWorkPrice"`
+	TotalPrice       float64           `json:"TotalPrice"`
+	DiscountPrice    float64           `json:"DiscountPrice"`
+	Options          []OrderItemOption `json:"Options"`
+	PreviewImages    []string          `json:"PreviewImages"`
+	AdditionalFields string            `json:"AdditionalFields"`
+	DirectoryName    string            `json:"DirectoryName"`
+	Comment          string            `json:"Comment"`
+}
+
+// OrderItemOption represent pp Order Item Option
+type OrderItemOption struct {
+	Title           string  `json:"Title"`
+	Description     string  `json:"Description"`
+	Price           float64 `json:"Price"`
+	PriceFormatType string  `json:"PriceFormatType"`
 }

@@ -1,11 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	http1 "net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/go-kit/kit/endpoint"
@@ -30,9 +33,17 @@ func New(instance string, options map[string][]http.ClientOption, mdw map[string
 			countOrdersEndpoint = m(countOrdersEndpoint)
 		}
 	}
+	var getOrdersEndpoint endpoint.Endpoint
+	{
+		getOrdersEndpoint = http.NewClient("GET", copyURL(u, "/orders"), encodeGetOrdersRequest, decodeGetOrdersResponse, options["GetOrders"]...).Endpoint()
+		for _, m := range mdw["GetOrders"] {
+			getOrdersEndpoint = m(getOrdersEndpoint)
+		}
+	}
 
 	return Endpoints{
 		CountOrdersEndpoint: countOrdersEndpoint,
+		GetOrdersEndpoint:   getOrdersEndpoint,
 	}, nil
 }
 
@@ -50,6 +61,42 @@ func decodeCountOrderResponse(_ context.Context, r *http1.Response) (interface{}
 	}
 	var resp CountOrdersResponse
 	err := json.NewDecoder(r.Body).Decode(&resp)
+	return resp, err
+}
+
+func encodeGetOrdersRequest(_ context.Context, r *http1.Request, request interface{}) error {
+	req := request.(GetOrdersRequest)
+	q := r.URL.Query()
+	if req.ShippingID != 0 {
+		q.Add("shippingId", strconv.Itoa(req.ShippingID))
+	}
+	if req.Skip != 0 {
+		q.Add("skip", strconv.Itoa(req.Skip))
+	}
+	if req.Status != "" {
+		q.Add("status", req.Status)
+	}
+	if req.Take != 0 {
+		q.Add("take", strconv.Itoa(req.Take))
+	}
+	if req.UserID != 0 {
+		q.Add("userId", strconv.Itoa(req.UserID))
+	}
+	r.URL.RawQuery = q.Encode()
+	return nil
+}
+
+func decodeGetOrdersResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+	if r.StatusCode != http1.StatusOK {
+		return nil, statusError(r.StatusCode)
+	}
+	var raw bytes.Buffer
+	var resp GetOrdersResponse
+	tee := io.TeeReader(r.Body, &raw)
+	//err := json.NewDecoder(r.Body).Decode(&resp)
+	err := json.NewDecoder(tee).Decode(&resp)
+	resp.RawResponse = raw.String()
+	fmt.Println(resp.RawResponse)
 	return resp, err
 }
 

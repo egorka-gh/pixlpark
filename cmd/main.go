@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/egorka-gh/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/service"
@@ -17,8 +15,8 @@ func main() {
 
 	logger := initLoger("")
 	cnf := &oauth.Config{
-		PublicKey:  "2ef2d5233fcc49bba387a51aabefb678",
-		PrivateKey: "24a1aad1c8364d87ae1dde60c8be6dbc",
+		PublicKey:  "aac2028cc33c4970b9e1a829ca7acd7b",
+		PrivateKey: "0227f3943b214603b7fa9431a09b325d",
 		Endpoint: oauth.Endpoint{
 			RequestURL: "http://api.pixlpark.com/oauth/requesttoken",
 			RefreshURL: "http://api.pixlpark.com/oauth/refreshtoken",
@@ -33,53 +31,45 @@ func main() {
 	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	orders, err := ttClient.GetOrders(context.Background(), "", 0, 0, 0, 0)
+	if err != nil {
+		logger.Log("GetOrders error", err.Error())
+	}
+	logger.Log("Responce", fmt.Sprintf("%+v", orders))
+	/*
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
 
-	q := make(chan os.Signal, 1)
-	signal.Notify(q, syscall.SIGINT, syscall.SIGTERM)
-	var calls int
-	for alive := true; alive; {
-		select {
-		case <-q:
-			alive = false
-		case <-ticker.C:
-			calls++
-			if calls < 3 {
-				//calls vsout refresh
-				//r, err := c.Get(url)
-				count, err := ttClient.CountOrders(context.Background(), []string{})
-				if err != nil {
-					logger.Log("CountOrders error", err.Error())
-				}
-				/*
-					bodyBytes, err := ioutil.ReadAll(r.Body)
+		q := make(chan os.Signal, 1)
+		signal.Notify(q, syscall.SIGINT, syscall.SIGTERM)
+		var calls int
+		for alive := true; alive; {
+			select {
+			case <-q:
+				alive = false
+			case <-ticker.C:
+				calls++
+				if calls < 3 {
+					//calls vsout refresh
+					//r, err := c.Get(url)
+					count, err := ttClient.CountOrders(context.Background(), []string{})
 					if err != nil {
-						cnf.Logger.Log("fetching error", err.Error())
+						logger.Log("CountOrders error", err.Error())
 					}
-					cnf.Logger.Log("Responce", string(bodyBytes))
-					//io.Copy(os.Stdout, r.Body)
-					r.Body.Close()
-				*/
-				logger.Log("Responce", count)
-			} else {
-				//alive = false
-				//waite till can refresh
-				//fist call will refresh
-				if calls > 25 {
-					calls = 0
-				}
-				/*
-					//waite till can't refresh
-					//fist call will fetch
-					if calls > 30 {
+					logger.Log("Responce", count)
+				} else {
+					//alive = false
+					//waite till can refresh
+					//fist call will refresh
+					if calls > 25 {
 						calls = 0
 					}
-				*/
+				}
+				//rerun work
 			}
-			//rerun work
 		}
-	}
+
+	*/
 
 }
 

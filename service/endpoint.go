@@ -12,6 +12,7 @@ import (
 // single parameter.
 type Endpoints struct {
 	CountOrdersEndpoint endpoint.Endpoint
+	GetOrdersEndpoint   endpoint.Endpoint
 }
 
 /* server version??
@@ -30,6 +31,7 @@ func New(s service.ZsyncService, mdw map[string][]endpoint.Middleware) Endpoints
 type basePPResponse struct {
 	APIVersion   string `json:"ApiVersion"`
 	ResponseCode int    `json:"ResponseCode"`
+	RawResponse  string `json:"-"`
 }
 
 func (b basePPResponse) checAPIVersion() error {
@@ -38,6 +40,8 @@ func (b basePPResponse) checAPIVersion() error {
 	}
 	return nil
 }
+
+//*************** CountOrders
 
 // CountOrdersRequest collects the request parameters for the CountOrders method.
 type CountOrdersRequest struct {
@@ -70,4 +74,35 @@ func (e Endpoints) CountOrders(ctx context.Context, statuses []string) (count in
 		return 0, fmt.Errorf("Wrong Result len. Expected 1 item. Got %d", len(resp.Result))
 	}
 	return resp.Result[0].Count, nil
+}
+
+//*************** GetOrders
+
+//GetOrdersRequest collects the request parameters for the GetOrders method.
+type GetOrdersRequest struct {
+	Take       int
+	Skip       int
+	Status     string
+	UserID     int
+	ShippingID int
+}
+
+// GetOrdersResponse collects the response parameters for the CountOrders method.
+type GetOrdersResponse struct {
+	basePPResponse
+	Result []Order `json:"Result"`
+}
+
+// GetOrders implements Service. Primarily useful in a client.
+func (e Endpoints) GetOrders(ctx context.Context, status string, userID, shippingID, take, skip int) ([]Order, error) {
+	request := GetOrdersRequest{Take: take, Skip: skip, Status: status, UserID: userID, ShippingID: shippingID}
+	response, err := e.GetOrdersEndpoint(ctx, request)
+	if err != nil {
+		return []Order{}, err
+	}
+	resp := response.(GetOrdersResponse)
+	if err = resp.checAPIVersion(); err != nil {
+		return []Order{}, err
+	}
+	return resp.Result, nil
 }
