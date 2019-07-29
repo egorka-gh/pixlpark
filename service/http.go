@@ -40,10 +40,18 @@ func New(instance string, options map[string][]http.ClientOption, mdw map[string
 			getOrdersEndpoint = m(getOrdersEndpoint)
 		}
 	}
+	var getOrderItemsEndpoint endpoint.Endpoint
+	{
+		getOrderItemsEndpoint = http.NewClient("GET", copyURL(u, "/orders"), encodeGetOrderItemsRequest, decodeGetOrderItemsResponse, options["GetOrderItems"]...).Endpoint()
+		for _, m := range mdw["GetOrderItems"] {
+			getOrderItemsEndpoint = m(getOrderItemsEndpoint)
+		}
+	}
 
 	return Endpoints{
-		CountOrdersEndpoint: countOrdersEndpoint,
-		GetOrdersEndpoint:   getOrdersEndpoint,
+		CountOrdersEndpoint:   countOrdersEndpoint,
+		GetOrdersEndpoint:     getOrdersEndpoint,
+		GetOrderItemsEndpoint: getOrderItemsEndpoint,
 	}, nil
 }
 
@@ -90,13 +98,39 @@ func decodeGetOrdersResponse(_ context.Context, r *http1.Response) (interface{},
 	if r.StatusCode != http1.StatusOK {
 		return nil, statusError(r.StatusCode)
 	}
-	var raw bytes.Buffer
 	var resp GetOrdersResponse
+	/* to debug response
+	var raw bytes.Buffer
 	tee := io.TeeReader(r.Body, &raw)
-	//err := json.NewDecoder(r.Body).Decode(&resp)
 	err := json.NewDecoder(tee).Decode(&resp)
 	resp.RawResponse = raw.String()
 	fmt.Println(resp.RawResponse)
+	*/
+	err := json.NewDecoder(r.Body).Decode(&resp)
+	return resp, err
+}
+
+func encodeGetOrderItemsRequest(_ context.Context, r *http1.Request, request interface{}) error {
+	req := request.(GetOrderItemsRequest)
+	///orders/{id}/items
+	url := copyURL(r.URL, r.URL.Path+"/"+req.OrderID+"/items")
+	r.URL = url
+	return nil
+}
+
+func decodeGetOrderItemsResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+	if r.StatusCode != http1.StatusOK {
+		return nil, statusError(r.StatusCode)
+	}
+	var resp GetOrderItemsResponse
+	/* to debug response */
+	var raw bytes.Buffer
+	tee := io.TeeReader(r.Body, &raw)
+	err := json.NewDecoder(tee).Decode(&resp)
+	resp.RawResponse = raw.String()
+	fmt.Println(resp.RawResponse)
+	/**/
+	//err := json.NewDecoder(r.Body).Decode(&resp)
 	return resp, err
 }
 

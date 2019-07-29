@@ -11,8 +11,9 @@ import (
 // meant to be used as a helper struct, to collect all of the endpoints into a
 // single parameter.
 type Endpoints struct {
-	CountOrdersEndpoint endpoint.Endpoint
-	GetOrdersEndpoint   endpoint.Endpoint
+	CountOrdersEndpoint   endpoint.Endpoint
+	GetOrdersEndpoint     endpoint.Endpoint
+	GetOrderItemsEndpoint endpoint.Endpoint
 }
 
 /* server version??
@@ -34,7 +35,7 @@ type basePPResponse struct {
 	RawResponse  string `json:"-"`
 }
 
-func (b basePPResponse) checAPIVersion() error {
+func (b basePPResponse) checkAPIVersion() error {
 	if b.APIVersion != APIVersion {
 		return fmt.Errorf("Wrong API version. Expected %s. Got %s", APIVersion, b.APIVersion)
 	}
@@ -67,7 +68,7 @@ func (e Endpoints) CountOrders(ctx context.Context, statuses []string) (count in
 		return
 	}
 	resp := response.(CountOrdersResponse)
-	if err = resp.checAPIVersion(); err != nil {
+	if err = resp.checkAPIVersion(); err != nil {
 		return
 	}
 	if len(resp.Result) != 1 {
@@ -101,8 +102,35 @@ func (e Endpoints) GetOrders(ctx context.Context, status string, userID, shippin
 		return []Order{}, err
 	}
 	resp := response.(GetOrdersResponse)
-	if err = resp.checAPIVersion(); err != nil {
+	if err = resp.checkAPIVersion(); err != nil {
 		return []Order{}, err
+	}
+	return resp.Result, nil
+}
+
+//*************** GetOrderItems
+
+//GetOrderItemsRequest collects the request parameters for the GetOrderItems method.
+type GetOrderItemsRequest struct {
+	OrderID string
+}
+
+// GetOrderItemsResponse collects the response parameters for the GetOrderItems method.
+type GetOrderItemsResponse struct {
+	basePPResponse
+	Result []OrderItem `json:"Result"`
+}
+
+// GetOrderItems implements Service. Primarily useful in a client.
+func (e Endpoints) GetOrderItems(ctx context.Context, orderID string) ([]OrderItem, error) {
+	request := GetOrderItemsRequest{OrderID: orderID}
+	response, err := e.GetOrderItemsEndpoint(ctx, request)
+	if err != nil {
+		return []OrderItem{}, err
+	}
+	resp := response.(GetOrderItemsResponse)
+	if err = resp.checkAPIVersion(); err != nil {
+		return []OrderItem{}, err
 	}
 	return resp.Result, nil
 }

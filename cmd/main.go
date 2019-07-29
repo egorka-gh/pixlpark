@@ -34,8 +34,18 @@ func main() {
 	orders, err := ttClient.GetOrders(context.Background(), "", 0, 0, 0, 0)
 	if err != nil {
 		logger.Log("GetOrders error", err.Error())
+	} else {
+		logger.Log("Responce", fmt.Sprintf("%+v", orders))
+
+		for _, o := range orders {
+			items, err := ttClient.GetOrderItems(context.Background(), o.ID)
+			if err != nil {
+				logger.Log("OrderItemsId", o.ID, "GetOrderItems error", err.Error())
+			} else {
+				logger.Log("OrderItemsId", o.ID, "Responce", fmt.Sprintf("%+v", items))
+			}
+		}
 	}
-	logger.Log("Responce", fmt.Sprintf("%+v", orders))
 	/*
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()

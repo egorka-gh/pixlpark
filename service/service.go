@@ -17,13 +17,13 @@ const APIVersion = "1.0"
 type PPService interface {
 	CountOrders(ctx context.Context, statuses []string) (int, error)
 	GetOrders(ctx context.Context, status string, userID, shippingID, take, skip int) ([]Order, error)
+	GetOrderItems(ctx context.Context, orderID string) ([]OrderItem, error)
 }
 
 //Date is time.Time, used to Unmarshal custom date format
 type Date time.Time
 
 //UnmarshalJSON  Unmarshal custom date format
-//TODO write test
 //TODO уточнить формат у PP
 func (d *Date) UnmarshalJSON(b []byte) error {
 	if len(b) == 0 || string(b) == "null" {
@@ -62,31 +62,40 @@ func (d Date) format(s string) string {
 	return t.Format(s)
 }
 
+//String implementing Stringer interface
+func (d Date) String() string {
+	return d.format(time.RFC3339)
+}
+
 // Order represent pp order
 type Order struct {
-	ID              string          `json:"Id"`
-	CustomID        string          `json:"CustomId"`
-	SourceOrderID   string          `json:"SourceOrderId"`
-	Title           string          `json:"Title"`
-	TrackingURL     string          `json:"TrackingUrl"`
-	TrackingNumber  string          `json:"TrackingNumber"`
-	Status          string          `json:"Status"`
-	RenderStatus    string          `json:"RenderStatus"`
-	PaymentStatus   string          `json:"PaymentStatus"`
-	DeliveryAddress DeliveryAddress `json:"DeliveryAddress"`
-	Shipping        Shipping        `json:"Shipping"`
-	CommentsCount   int             `json:"CommentsCount"`
-	DownloadLink    string          `json:"DownloadLink"`
-	PreviewImageURL string          `json:"PreviewImageUrl"`
-	Price           float64         `json:"Price"`
-	DiscountPrice   float64         `json:"DiscountPrice"`
-	DeliveryPrice   float64         `json:"DeliveryPrice"`
-	TotalPrice      float64         `json:"TotalPrice"`
-	PaidPrice       float64         `json:"PaidPrice"`
-	UserID          int             `json:"UserId"`
-	DiscountID      int             `json:"DiscountId"`
-	DateCreated     Date            `json:"DateCreated,string"`
-	DateModified    Date            `json:"DateModified,string"`
+	ID                   string          `json:"Id"`
+	PhotolabID           int             `json:"PhotolabId"`
+	CustomID             string          `json:"CustomId"`
+	SourceOrderID        string          `json:"SourceOrderId"`
+	ManagerID            string          `json:"ManagerId"`
+	Title                string          `json:"Title"`
+	TrackingURL          string          `json:"TrackingUrl"`
+	TrackingNumber       string          `json:"TrackingNumber"`
+	Status               string          `json:"Status"`
+	RenderStatus         string          `json:"RenderStatus"`
+	PaymentStatus        string          `json:"PaymentStatus"`
+	DeliveryAddress      DeliveryAddress `json:"DeliveryAddress"`
+	Shipping             Shipping        `json:"Shipping"`
+	CommentsCount        int             `json:"CommentsCount"`
+	DownloadLink         string          `json:"DownloadLink"`
+	PreviewImageURL      string          `json:"PreviewImageUrl"`
+	Price                float64         `json:"Price"`
+	DiscountPrice        float64         `json:"DiscountPrice"`
+	DeliveryPrice        float64         `json:"DeliveryPrice"`
+	TotalPrice           float64         `json:"TotalPrice"`
+	PaidPrice            float64         `json:"PaidPrice"`
+	UserID               int             `json:"UserId"`
+	UserCompanyAccountID string          `json:"UserCompanyAccountId"`
+	DiscountID           int             `json:"DiscountId"` //?? no in response
+	DiscountTitle        string          `json:"DiscountTitle"`
+	DateCreated          Date            `json:"DateCreated,string"`
+	DateModified         Date            `json:"DateModified,string"`
 }
 
 // DeliveryAddress represent pp DeliveryAddress
@@ -97,6 +106,7 @@ type DeliveryAddress struct {
 	Description  string `json:"Description"`
 	City         string `json:"City"`
 	Country      string `json:"Country"`
+	State        string `json:"State"`
 	FullName     string `json:"FullName"`
 	Phone        string `json:"Phone"`
 }
@@ -107,13 +117,15 @@ type Shipping struct {
 	Title        string `json:"Title"`
 	Phone        string `json:"Phone"`
 	Email        string `json:"Email"`
-	ShippingType string `json:"ShippingType"`
+	ShippingType string `json:"ShippingType"` //?? no in response
+	Type         string `json:"Type"`
 }
 
 // OrderItem represent pp Order Item
 type OrderItem struct {
 	ID               int               `json:"Id"`
-	OrderID          string            `json:"OrderId"`
+	OrderID          int               `json:"OrderId"`
+	MaterialID       int               `json:"MaterialId"` //product id
 	Name             string            `json:"Name"`
 	Description      string            `json:"Description"`
 	Quantity         int               `json:"Quantity"`
@@ -122,9 +134,11 @@ type OrderItem struct {
 	CustomWorkPrice  float64           `json:"CustomWorkPrice"`
 	TotalPrice       float64           `json:"TotalPrice"`
 	DiscountPrice    float64           `json:"DiscountPrice"`
-	Options          []OrderItemOption `json:"Options"`
+	PageCount        int               `json:"PageCount"`
+	SkuItems         []OrderItemSku    `json:"SkuItems"`
 	PreviewImages    []string          `json:"PreviewImages"`
-	AdditionalFields string            `json:"AdditionalFields"`
+	Options          []OrderItemOption `json:"Options"`
+	AdditionalFields map[string]string `json:"AdditionalFields"`
 	DirectoryName    string            `json:"DirectoryName"`
 	Comment          string            `json:"Comment"`
 }
@@ -135,4 +149,10 @@ type OrderItemOption struct {
 	Description     string  `json:"Description"`
 	Price           float64 `json:"Price"`
 	PriceFormatType string  `json:"PriceFormatType"`
+}
+
+// OrderItemSku represent pp Order Item SKU
+type OrderItemSku struct {
+	Name  string `json:"Title"`
+	Value string `json:"Description"`
 }

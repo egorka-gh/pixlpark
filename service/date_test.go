@@ -5,9 +5,9 @@ import (
 )
 
 func TestDateUnmarshal(t *testing.T) {
-	dateStr1 := "/Date(1331083326130)/"
-	dateStr2 := "/Date(1564133280000)/"
-	var date *Date = &Date{}
+	dateStr1 := "\"/Date(1331083326130)/\""
+	dateStr2 := "\"\\/Date(1564133280000)\\/\""
+	date := &Date{}
 	//err := json.NewDecoder(strings.NewReader(dateStr)).Decode(&date)
 	err := date.UnmarshalJSON([]byte(dateStr1))
 	if err != nil {

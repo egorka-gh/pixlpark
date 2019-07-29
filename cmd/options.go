@@ -11,7 +11,7 @@ import (
 	"github.com/go-kit/kit/transport/http"
 )
 
-var methods = []string{"CountOrders", "GetOrders", "dummi"}
+var methods = []string{"CountOrders", "GetOrders", "GetOrderItems", "dummi"}
 
 func defaultHTTPOptions(cli *http0.Client, logger log.Logger) map[string][]http.ClientOption {
 	//cli := defaultHttpClient()
