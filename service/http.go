@@ -99,14 +99,14 @@ func decodeGetOrdersResponse(_ context.Context, r *http1.Response) (interface{},
 		return nil, statusError(r.StatusCode)
 	}
 	var resp GetOrdersResponse
-	/* to debug response
+	/* to debug response */
 	var raw bytes.Buffer
 	tee := io.TeeReader(r.Body, &raw)
 	err := json.NewDecoder(tee).Decode(&resp)
 	resp.RawResponse = raw.String()
 	fmt.Println(resp.RawResponse)
-	*/
-	err := json.NewDecoder(r.Body).Decode(&resp)
+	/**/
+	//err := json.NewDecoder(r.Body).Decode(&resp)
 	return resp, err
 }
 

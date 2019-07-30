@@ -14,6 +14,8 @@ import (
 func main() {
 
 	logger := initLoger("")
+	/* */
+	//http://api.pixlpark.com
 	cnf := &oauth.Config{
 		PublicKey:  "aac2028cc33c4970b9e1a829ca7acd7b",
 		PrivateKey: "0227f3943b214603b7fa9431a09b325d",
@@ -24,9 +26,24 @@ func main() {
 		},
 		//Logger: logger,
 	}
+	/* */
 
-	//url := "http://api.pixlpark.com/orders/count"
+	/*
+		//http://api.staging.pixlpark.com
+		cnf := &oauth.Config{
+			PublicKey:  "2ef2d5233fcc49bba387a51aabefb678",
+			PrivateKey: "24a1aad1c8364d87ae1dde60c8be6dbc",
+			Endpoint: oauth.Endpoint{
+				RequestURL: "http://api.staging.pixlpark.com/oauth/requesttoken",
+				RefreshURL: "http://api.staging.pixlpark.com/oauth/refreshtoken",
+				TokenURL:   "http://api.staging.pixlpark.com/oauth/accesstoken",
+			},
+			//Logger: logger,
+		}
+	*/
+
 	url := "http://api.pixlpark.com"
+	//url := "http://api.staging.pixlpark.com"
 	oauthClient := cnf.Client(context.Background(), nil)
 	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
@@ -45,7 +62,49 @@ func main() {
 				logger.Log("OrderItemsId", o.ID, "Responce", fmt.Sprintf("%+v", items))
 			}
 		}
+		/*
+			//try to load
+			loader := grab.NewClient()
+			wrkFolder := "D:\\Buffer\\tmp\\"
+			for _, o := range orders {
+				req, _ := grab.NewRequest(wrkFolder+o.ID+".zip", o.DownloadLink)
+
+				// start download
+				fmt.Printf("Downloading %v...\n", req.URL())
+				resp := loader.Do(req)
+				fmt.Printf("  %v\n", resp.HTTPResponse.Status)
+
+				// start UI loop
+				t := time.NewTicker(500 * time.Millisecond)
+				//defer t.Stop()
+
+			Loop:
+				for {
+					select {
+					case <-t.C:
+						fmt.Printf("  transferred %v / %v bytes (%.2f%%)\n",
+							resp.BytesComplete(),
+							resp.Size(),
+							100*resp.Progress())
+
+					case <-resp.Done:
+						// download is complete
+						break Loop
+					}
+				}
+				t.Stop()
+
+				// check for errors
+				if err := resp.Err(); err != nil {
+					fmt.Fprintf(os.Stderr, "Download failed: %v\n", err)
+					//os.Exit(1)
+				}
+
+				fmt.Printf("Download saved to ./%v \n", resp.Filename)
+			}
+		*/
 	}
+	//
 	/*
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
