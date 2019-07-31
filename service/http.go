@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	http1 "net/http"
 	"net/url"
 	"strconv"
@@ -40,6 +41,13 @@ func New(instance string, options map[string][]http.ClientOption, mdw map[string
 			getOrdersEndpoint = m(getOrdersEndpoint)
 		}
 	}
+	var getOrderEndpoint endpoint.Endpoint
+	{
+		getOrderEndpoint = http.NewClient("GET", copyURL(u, "/orders"), encodeGetOrderRequest, decodeGetOrdersResponse, options["GetOrder"]...).Endpoint()
+		for _, m := range mdw["GetOrder"] {
+			getOrderEndpoint = m(getOrderEndpoint)
+		}
+	}
 	var getOrderItemsEndpoint endpoint.Endpoint
 	{
 		getOrderItemsEndpoint = http.NewClient("GET", copyURL(u, "/orders"), encodeGetOrderItemsRequest, decodeGetOrderItemsResponse, options["GetOrderItems"]...).Endpoint()
@@ -47,11 +55,20 @@ func New(instance string, options map[string][]http.ClientOption, mdw map[string
 			getOrderItemsEndpoint = m(getOrderItemsEndpoint)
 		}
 	}
+	var setOrderStatusEndpoint endpoint.Endpoint
+	{
+		setOrderStatusEndpoint = http.NewClient("POST", copyURL(u, "/orders"), encodeSetOrderStatusRequest, decodeSetOrderStatusResponse, options["SetOrderStatus"]...).Endpoint()
+		for _, m := range mdw["SetOrderStatus"] {
+			setOrderStatusEndpoint = m(setOrderStatusEndpoint)
+		}
+	}
 
 	return Endpoints{
-		CountOrdersEndpoint:   countOrdersEndpoint,
-		GetOrdersEndpoint:     getOrdersEndpoint,
-		GetOrderItemsEndpoint: getOrderItemsEndpoint,
+		CountOrdersEndpoint:    countOrdersEndpoint,
+		GetOrdersEndpoint:      getOrdersEndpoint,
+		GetOrderEndpoint:       getOrderEndpoint,
+		GetOrderItemsEndpoint:  getOrderItemsEndpoint,
+		SetOrderStatusEndpoint: setOrderStatusEndpoint,
 	}, nil
 }
 
@@ -99,15 +116,23 @@ func decodeGetOrdersResponse(_ context.Context, r *http1.Response) (interface{},
 		return nil, statusError(r.StatusCode)
 	}
 	var resp GetOrdersResponse
-	/* to debug response */
+	/* to debug response
 	var raw bytes.Buffer
 	tee := io.TeeReader(r.Body, &raw)
 	err := json.NewDecoder(tee).Decode(&resp)
 	resp.RawResponse = raw.String()
 	fmt.Println(resp.RawResponse)
-	/**/
-	//err := json.NewDecoder(r.Body).Decode(&resp)
+	*/
+	err := json.NewDecoder(r.Body).Decode(&resp)
 	return resp, err
+}
+
+func encodeGetOrderRequest(_ context.Context, r *http1.Request, request interface{}) error {
+	req := request.(GetOrderRequest)
+	///orders/{id}/items
+	url := copyURL(r.URL, r.URL.Path+"/"+req.ID)
+	r.URL = url
+	return nil
 }
 
 func encodeGetOrderItemsRequest(_ context.Context, r *http1.Request, request interface{}) error {
@@ -123,6 +148,49 @@ func decodeGetOrderItemsResponse(_ context.Context, r *http1.Response) (interfac
 		return nil, statusError(r.StatusCode)
 	}
 	var resp GetOrderItemsResponse
+	/* to debug response
+	var raw bytes.Buffer
+	tee := io.TeeReader(r.Body, &raw)
+	err := json.NewDecoder(tee).Decode(&resp)
+	resp.RawResponse = raw.String()
+	fmt.Println(resp.RawResponse)
+	*/
+	err := json.NewDecoder(r.Body).Decode(&resp)
+	return resp, err
+}
+
+func encodeSetOrderStatusRequest(_ context.Context, r *http1.Request, request interface{}) error {
+	req := request.(SetOrderStatusRequest)
+	// /orders/{id}/status
+	rurl := copyURL(r.URL, r.URL.Path+"/"+req.OrderID+"/status")
+	r.URL = rurl
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	form := url.Values{}
+	form.Add("newStatus", req.Status)
+	if req.Notify {
+		form.Add("sendNotifications", "true")
+	} else {
+		form.Add("sendNotifications", "false")
+	}
+	r.Body = ioutil.NopCloser(strings.NewReader(form.Encode()))
+
+	/*
+		q := r.URL.Query()
+		q.Add("newStatus", req.Status)
+		if req.Notify {
+			q.Add("sendNotifications", "true")
+		}
+		r.URL.RawQuery = q.Encode()
+	*/
+
+	return nil
+}
+
+func decodeSetOrderStatusResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+	if r.StatusCode != http1.StatusOK {
+		return nil, statusError(r.StatusCode)
+	}
+	var resp SetOrderStatusResponse
 	/* to debug response */
 	var raw bytes.Buffer
 	tee := io.TeeReader(r.Body, &raw)

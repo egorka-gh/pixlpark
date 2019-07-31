@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/egorka-gh/pixlpark/oauth"
@@ -48,62 +47,75 @@ func main() {
 	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
 
-	orders, err := ttClient.GetOrders(context.Background(), "", 0, 0, 0, 0)
+	err := ttClient.SetOrderStatus(context.Background(), "1850708", "ReadyToProcessing", false)
+	//TODO double array in success response
+	//TODO warning {"ApiVersion":"1.0","Result":[[{"Type":"Warning","Description":"Заказ уже находится в этом статусе.","DateCreated":"31.07.2019 15:04"}]],"ResponseCode":200}
+	//TODO api  can set any state?
+	//err response {"ApiVersion":"1.0","ErrorMessage":"Not found","ResponseCode":404}
 	if err != nil {
 		logger.Log("GetOrders error", err.Error())
-	} else {
-		logger.Log("Responce", fmt.Sprintf("%+v", orders))
+	}
 
-		for _, o := range orders {
-			items, err := ttClient.GetOrderItems(context.Background(), o.ID)
-			if err != nil {
-				logger.Log("OrderItemsId", o.ID, "GetOrderItems error", err.Error())
-			} else {
-				logger.Log("OrderItemsId", o.ID, "Responce", fmt.Sprintf("%+v", items))
+	/*
+		loadZip := false
+		orders, err := ttClient.GetOrders(context.Background(), "", 0, 0, 0, 0)
+		if err != nil {
+			logger.Log("GetOrders error", err.Error())
+		} else {
+			logger.Log("Responce", fmt.Sprintf("%+v", orders))
+
+			for _, o := range orders {
+				items, err := ttClient.GetOrderItems(context.Background(), o.ID)
+				if err != nil {
+					logger.Log("OrderItemsId", o.ID, "GetOrderItems error", err.Error())
+				} else {
+					logger.Log("OrderItemsId", o.ID, "Responce", fmt.Sprintf("%+v", items))
+				}
+			}
+			if loadZip {
+				//try to load
+				loader := grab.NewClient()
+				wrkFolder := "D:\\Buffer\\tmp\\"
+				for _, o := range orders {
+					req, _ := grab.NewRequest(wrkFolder+o.ID+".zip", o.DownloadLink)
+
+					// start download
+					fmt.Printf("Downloading %v...\n", req.URL())
+					resp := loader.Do(req)
+					fmt.Printf("  %v\n", resp.HTTPResponse.Status)
+
+					// start UI loop
+					t := time.NewTicker(500 * time.Millisecond)
+					//defer t.Stop()
+
+				Loop:
+					for {
+						select {
+						case <-t.C:
+							fmt.Printf("  transferred %v / %v bytes (%.2f%%)\n",
+								resp.BytesComplete(),
+								resp.Size(),
+								100*resp.Progress())
+
+						case <-resp.Done:
+							// download is complete
+							break Loop
+						}
+					}
+					t.Stop()
+
+					// check for errors
+					if err := resp.Err(); err != nil {
+						fmt.Fprintf(os.Stderr, "Download failed: %v\n", err)
+						//os.Exit(1)
+					}
+
+					fmt.Printf("Download saved to ./%v \n", resp.Filename)
+				}
 			}
 		}
-		/*
-			//try to load
-			loader := grab.NewClient()
-			wrkFolder := "D:\\Buffer\\tmp\\"
-			for _, o := range orders {
-				req, _ := grab.NewRequest(wrkFolder+o.ID+".zip", o.DownloadLink)
+	*/
 
-				// start download
-				fmt.Printf("Downloading %v...\n", req.URL())
-				resp := loader.Do(req)
-				fmt.Printf("  %v\n", resp.HTTPResponse.Status)
-
-				// start UI loop
-				t := time.NewTicker(500 * time.Millisecond)
-				//defer t.Stop()
-
-			Loop:
-				for {
-					select {
-					case <-t.C:
-						fmt.Printf("  transferred %v / %v bytes (%.2f%%)\n",
-							resp.BytesComplete(),
-							resp.Size(),
-							100*resp.Progress())
-
-					case <-resp.Done:
-						// download is complete
-						break Loop
-					}
-				}
-				t.Stop()
-
-				// check for errors
-				if err := resp.Err(); err != nil {
-					fmt.Fprintf(os.Stderr, "Download failed: %v\n", err)
-					//os.Exit(1)
-				}
-
-				fmt.Printf("Download saved to ./%v \n", resp.Filename)
-			}
-		*/
-	}
 	//
 	/*
 		ticker := time.NewTicker(10 * time.Second)

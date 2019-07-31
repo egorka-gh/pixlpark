@@ -17,7 +17,9 @@ const APIVersion = "1.0"
 type PPService interface {
 	CountOrders(ctx context.Context, statuses []string) (int, error)
 	GetOrders(ctx context.Context, status string, userID, shippingID, take, skip int) ([]Order, error)
+	GetOrder(ctx context.Context, id string) (Order, error)
 	GetOrderItems(ctx context.Context, orderID string) ([]OrderItem, error)
+	SetOrderStatus(ctx context.Context, id, status string, notify bool) error
 }
 
 //Date is time.Time, used to Unmarshal custom date format
