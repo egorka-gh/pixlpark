@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -12,11 +13,12 @@ import (
 // meant to be used as a helper struct, to collect all of the endpoints into a
 // single parameter.
 type Endpoints struct {
-	CountOrdersEndpoint    endpoint.Endpoint
-	GetOrdersEndpoint      endpoint.Endpoint
-	GetOrderItemsEndpoint  endpoint.Endpoint
-	GetOrderEndpoint       endpoint.Endpoint
-	SetOrderStatusEndpoint endpoint.Endpoint
+	CountOrdersEndpoint     endpoint.Endpoint
+	GetOrdersEndpoint       endpoint.Endpoint
+	GetOrderItemsEndpoint   endpoint.Endpoint
+	GetOrderEndpoint        endpoint.Endpoint
+	SetOrderStatusEndpoint  endpoint.Endpoint
+	AddOrderCommentEndpoint endpoint.Endpoint
 }
 
 /* server version??
@@ -46,9 +48,8 @@ func (b basePPResponse) check() error {
 	if b.ResponseCode != 200 {
 		if b.ErrorMessage == "" {
 			return fmt.Errorf("Wrong ResponseCode %d", b.ResponseCode)
-		} else {
-			return fmt.Errorf("ResponseCode: %d; ErrorMessage: %s", b.ResponseCode, b.ErrorMessage)
 		}
+		return fmt.Errorf("ResponseCode: %d; ErrorMessage: %s", b.ResponseCode, b.ErrorMessage)
 	}
 	return nil
 }
@@ -196,7 +197,7 @@ type SetOrderStatusRequest struct {
 // SetOrderStatusResponse collects the response parameters for the GetOrderItems method.
 type SetOrderStatusResponse struct {
 	basePPResponse
-	Result []setOrderStatusResult `json:"Result"`
+	Result [][]setOrderStatusResult `json:"Result"`
 }
 
 type setOrderStatusResult struct {
@@ -219,8 +220,62 @@ func (e Endpoints) SetOrderStatus(ctx context.Context, id, status string, notify
 	if len(resp.Result) != 1 {
 		return fmt.Errorf("Wrong Result len. Expected 1 item. Got %d", len(resp.Result))
 	}
-	if strings.ToLower(resp.Result[0].Type) != "success" {
-		return fmt.Errorf("Set status error: Type:%s; Description:%s", resp.Result[0].Type, resp.Result[0].Description)
+	if len(resp.Result[0]) == 0 {
+		return errors.New("Empty response")
 	}
+	t := strings.ToLower(resp.Result[0][0].Type)
+	if t != "success" && t != "warning" {
+		return fmt.Errorf("Set status error: Type:%s; Description:%s", resp.Result[0][0].Type, resp.Result[0][0].Description)
+	}
+	return nil
+}
+
+//*************** AddOrderComment
+
+//AddOrderCommentRequest collects the request parameters for the AddOrderComment method.
+type AddOrderCommentRequest struct {
+	OrderID string
+	Email   string
+	Comment string
+}
+
+// AddOrderCommentResponse collects the response parameters for the AddOrderComment method.
+type AddOrderCommentResponse struct {
+	basePPResponse
+	Result []addOrderCommentResult `json:"Result"`
+}
+
+type addOrderCommentResult struct {
+	ID            string `json:"Id"`
+	OrderID       string `json:"OrderId"`
+	Status        string `json:"Status"`
+	DateCreated   Date   `json:"DateCreated"`
+	BodySource    string `json:"BodySource"`
+	UserCreatedID string `json:"UserCreatedId"`
+}
+
+// AddOrderComment implements Service. Primarily useful in a client.
+func (e Endpoints) AddOrderComment(ctx context.Context, id, email, comment string) error {
+	request := AddOrderCommentRequest{OrderID: id, Email: email, Comment: comment}
+	response, err := e.AddOrderCommentEndpoint(ctx, request)
+	if err != nil {
+		return err
+	}
+	resp := response.(AddOrderCommentResponse)
+	if err = resp.check(); err != nil {
+		return err
+	}
+	if len(resp.Result) != 1 {
+		return fmt.Errorf("Wrong Result len. Expected 1 item. Got %d", len(resp.Result))
+	}
+	/*
+		if len(resp.Result[0]) == 0 {
+			return errors.New("Empty response")
+		}
+		t := strings.ToLower(resp.Result[0][0].Type)
+		if t != "success" && t != "warning" {
+			return fmt.Errorf("Set status error: Type:%s; Description:%s", resp.Result[0][0].Type, resp.Result[0][0].Description)
+		}
+	*/
 	return nil
 }

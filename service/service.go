@@ -20,6 +20,7 @@ type PPService interface {
 	GetOrder(ctx context.Context, id string) (Order, error)
 	GetOrderItems(ctx context.Context, orderID string) ([]OrderItem, error)
 	SetOrderStatus(ctx context.Context, id, status string, notify bool) error
+	AddOrderComment(ctx context.Context, id, email, comment string) error
 }
 
 //Date is time.Time, used to Unmarshal custom date format

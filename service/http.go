@@ -1,11 +1,9 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	http1 "net/http"
 	"net/url"
@@ -62,13 +60,21 @@ func New(instance string, options map[string][]http.ClientOption, mdw map[string
 			setOrderStatusEndpoint = m(setOrderStatusEndpoint)
 		}
 	}
+	var addOrderCommentEndpoint endpoint.Endpoint
+	{
+		addOrderCommentEndpoint = http.NewClient("POST", copyURL(u, "/orders"), encodeAddOrderCommentRequest, decodeAddOrderCommentResponse, options["AddOrderComment"]...).Endpoint()
+		for _, m := range mdw["AddOrderComment"] {
+			addOrderCommentEndpoint = m(addOrderCommentEndpoint)
+		}
+	}
 
 	return Endpoints{
-		CountOrdersEndpoint:    countOrdersEndpoint,
-		GetOrdersEndpoint:      getOrdersEndpoint,
-		GetOrderEndpoint:       getOrderEndpoint,
-		GetOrderItemsEndpoint:  getOrderItemsEndpoint,
-		SetOrderStatusEndpoint: setOrderStatusEndpoint,
+		CountOrdersEndpoint:     countOrdersEndpoint,
+		GetOrdersEndpoint:       getOrdersEndpoint,
+		GetOrderEndpoint:        getOrderEndpoint,
+		GetOrderItemsEndpoint:   getOrderItemsEndpoint,
+		SetOrderStatusEndpoint:  setOrderStatusEndpoint,
+		AddOrderCommentEndpoint: addOrderCommentEndpoint,
 	}, nil
 }
 
@@ -191,14 +197,42 @@ func decodeSetOrderStatusResponse(_ context.Context, r *http1.Response) (interfa
 		return nil, statusError(r.StatusCode)
 	}
 	var resp SetOrderStatusResponse
-	/* to debug response */
+	/* to debug response
 	var raw bytes.Buffer
 	tee := io.TeeReader(r.Body, &raw)
 	err := json.NewDecoder(tee).Decode(&resp)
 	resp.RawResponse = raw.String()
 	fmt.Println(resp.RawResponse)
-	/**/
-	//err := json.NewDecoder(r.Body).Decode(&resp)
+	*/
+	err := json.NewDecoder(r.Body).Decode(&resp)
+	return resp, err
+}
+
+func encodeAddOrderCommentRequest(_ context.Context, r *http1.Request, request interface{}) error {
+	req := request.(AddOrderCommentRequest)
+	// /orders/{id}/comments
+	r.URL = copyURL(r.URL, r.URL.Path+"/"+req.OrderID+"/comments")
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	form := url.Values{}
+	form.Add("email", req.Email)
+	form.Add("comment", req.Comment)
+	r.Body = ioutil.NopCloser(strings.NewReader(form.Encode()))
+	return nil
+}
+
+func decodeAddOrderCommentResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+	if r.StatusCode != http1.StatusOK {
+		return nil, statusError(r.StatusCode)
+	}
+	var resp AddOrderCommentResponse
+	/* to debug response
+	var raw bytes.Buffer
+	tee := io.TeeReader(r.Body, &raw)
+	err := json.NewDecoder(tee).Decode(&resp)
+	resp.RawResponse = raw.String()
+	fmt.Println(resp.RawResponse)
+	*/
+	err := json.NewDecoder(r.Body).Decode(&resp)
 	return resp, err
 }
 

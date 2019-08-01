@@ -47,15 +47,30 @@ func main() {
 	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
 
-	err := ttClient.SetOrderStatus(context.Background(), "1850708", "ReadyToProcessing", false)
-	//TODO double array in success response
-	//TODO warning {"ApiVersion":"1.0","Result":[[{"Type":"Warning","Description":"Заказ уже находится в этом статусе.","DateCreated":"31.07.2019 15:04"}]],"ResponseCode":200}
-	//TODO api  can set any state?
-	//err response {"ApiVersion":"1.0","ErrorMessage":"Not found","ResponseCode":404}
-	if err != nil {
-		logger.Log("GetOrders error", err.Error())
-	}
+	/*
+		err := ttClient.SetOrderStatus(context.Background(), "1850708", "ReadyToProcessing", false) //DesignCoordination //ReadyToProcessing
+		//TODO double array in success response
+		//TODO warning {"ApiVersion":"1.0","Result":[[{"Type":"Warning","Description":"Заказ уже находится в этом статусе.","DateCreated":"31.07.2019 15:04"}]],"ResponseCode":200}
+		//TODO api  can set any state?
+		//err response {"ApiVersion":"1.0","ErrorMessage":"Not found","ResponseCode":404}
+		if err != nil {
+			logger.Log("SetOrderStatus error", err.Error())
+		}
+	*/
 
+	/*
+		o, err := ttClient.GetOrder(context.Background(), "1850708")
+		if err != nil {
+			logger.Log("GetOrders error", err.Error())
+		} else {
+			logger.Log("Responce", fmt.Sprintf("%+v", o))
+		}
+	*/
+
+	err := ttClient.AddOrderComment(context.Background(), "1850708", "egorka@tut.by", "test add comment 2")
+	if err != nil {
+		logger.Log("AddOrderComment error", err.Error())
+	}
 	/*
 		loadZip := false
 		orders, err := ttClient.GetOrders(context.Background(), "", 0, 0, 0, 0)
