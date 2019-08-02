@@ -1,0 +1,114 @@
+/// <summary>
+		/// Заказ оформлен клиентом и ожидает подготовки
+		/// </summary>
+		[ApiName("Placed", false)] None = 1,
+
+		/// <summary>
+		/// Заказ подготавливается сервером для компании
+		/// </summary>
+		[ApiName("Placed", false)] Preparing = 2,
+
+		/// <summary>
+		/// Заказ подготовился и доступен компании для обработки
+		/// </summary>
+		[ApiName("Pending")] NotProcessed = 3,
+
+		/// <summary>
+		/// Ожидается оплата по заказу
+		/// </summary>
+		[ApiName("WaitingForPayment")] AwaitingPayment = 4,
+
+		/// <summary>
+		/// Получена оплата, готов к производству (ОПЛАЧЕН)
+		/// </summary>
+		[ApiName("Approved")] ReadyToProcessing = 5, //used
+
+		/// <summary>
+		/// Заказ на стадии разработки макета (ожидается ответ дизайнера)
+		/// </summary>
+		[ApiName("DesignInProgress")] DesignCoordination = 15,
+
+		/// <summary>
+		/// Дизайн заказа готов для проверки допечатником
+		/// </summary>
+		[ApiName("DesignCompleted")] DesignCoordinationComplete = 16,
+
+		/// <summary>
+		/// Заказ ожидает ответа от клиента для создания дизайна
+		/// </summary>
+		[ApiName("DesignWaiting")] DesignCoordinationAwaitingReply = 20,
+
+		/// <summary>
+		/// Заказ на стадии согласования c допечатником
+		/// </summary>
+		[ApiName("PrepressInProgress")] PrepressCoordination = 22,
+
+		/// <summary>
+		/// Заказ согласован с допечатником и готов к печати
+		/// </summary>
+		[ApiName("PrepressCompleted")] PrepressCoordinationComplete = 23,
+
+		/// <summary>
+		/// Заказ ожидает ответа от клиента для согласования с допечатником
+		/// </summary>
+		[ApiName("PrepressWaiting")] PrepressCoordinationAwaitingReply = 24,
+
+		/// <summary>
+		/// Заказ находится печати
+		/// </summary>
+		[ApiName("PrintingInProgress")] Printing = 17,
+
+		/// <summary>
+		/// Заказ выполнен с браком
+		/// </summary>
+		[ApiName("PrintingCompletedWithDefect")] PrintedWithDefect = 25,
+
+		/// <summary>
+		/// Послепечатная обработка заказа
+		/// </summary>
+		[ApiName("PostPressInProgress")] PostPress = 28, //used
+
+		/// <summary>
+		/// Заказ выполнен и готов к отправке
+		/// </summary>
+		[ApiName("Fulfilled")] Printed = 7, //used
+
+		/// <summary>
+		/// Заказ передан в службу доставки
+		/// </summary>
+		[ApiName("Shipped")] Shipped = 8,
+
+		/// <summary>
+		/// Заказ доставлен до склада транспортной компании
+		/// </summary>
+		[ApiName("DeliveredToPickupPoint")] ShippedToStorage = 18, //used
+
+		/// <summary>
+		/// Заказ возвращен
+		/// </summary>
+		[ApiName("Returned")] Returned = 26, //used
+
+		/// <summary>
+		/// Заказ отменен
+		/// </summary>
+		[ApiName("Cancelled")] Cancelled = 11, //used
+
+		/// <summary>
+		/// Заказ отменен по браку
+		/// </summary>
+		[ApiName("CancelledDueDefect")] CancelledWithDefect = 27, //used
+
+		/// <summary>
+		/// Заказ не забран
+		/// </summary>
+		[ApiName("CancelledDueAbandon")] Refused = 19, //used
+
+		/// <summary>
+		/// Заказ выдан
+		/// </summary>
+		[ApiName("Delivered")] Delivered = 12, //used
+
+		/// <summary>
+		/// Заказ удален (при переводе заказа в этот статус, заказ просто удаляется из системы)
+		/// </summary>
+		[ApiName("Deleted", false)] Deleted = 21, //used

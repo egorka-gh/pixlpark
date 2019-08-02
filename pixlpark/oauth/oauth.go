@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/egorka-gh/pixlpark/oauth/internal"
+	"github.com/egorka-gh/pixlpark/pixlpark/oauth/internal"
 	"github.com/go-kit/kit/log"
 )
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/egorka-gh/pixlpark/oauth"
-	"github.com/egorka-gh/pixlpark/service"
+	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
+	"github.com/egorka-gh/pixlpark/pixlpark/service"
 	log "github.com/go-kit/kit/log"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )

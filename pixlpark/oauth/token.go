@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/egorka-gh/pixlpark/oauth/internal"
+	"github.com/egorka-gh/pixlpark/pixlpark/oauth/internal"
 )
 
 // expiryDelta determines how earlier a refreshtoken should be considered
