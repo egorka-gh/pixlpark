@@ -1,71 +1,73 @@
 package service
 
-//StateNone represent service state
-const StateNone = "None"
+const (
+	//StateNone represent service state
+	StateNone = "None"
 
-//StatePreparing represent service state
-const StatePreparing = "Preparing"
+	//StatePreparing represent service state
+	StatePreparing = "Preparing"
 
-//StateNotProcessed represent service state
-const StateNotProcessed = "NotProcessed"
+	//StateNotProcessed represent service state
+	StateNotProcessed = "NotProcessed"
 
-//StateAwaitingPayment represent service state
-const StateAwaitingPayment = "AwaitingPayment"
+	//StateAwaitingPayment represent service state
+	StateAwaitingPayment = "AwaitingPayment"
 
-//StateReadyToProcessing represent service state
-const StateReadyToProcessing = "ReadyToProcessing"
+	//StateReadyToProcessing represent service state
+	StateReadyToProcessing = "ReadyToProcessing"
 
-//StateDesignCoordination represent service state
-const StateDesignCoordination = "DesignCoordination"
+	//StateDesignCoordination represent service state
+	StateDesignCoordination = "DesignCoordination"
 
-//StateDesignCoordinationComplete represent service state
-const StateDesignCoordinationComplete = "DesignCoordinationComplete"
+	//StateDesignCoordinationComplete represent service state
+	StateDesignCoordinationComplete = "DesignCoordinationComplete"
 
-//StateDesignCoordinationAwaitingReply represent service state
-const StateDesignCoordinationAwaitingReply = "DesignCoordinationAwaitingReply"
+	//StateDesignCoordinationAwaitingReply represent service state
+	StateDesignCoordinationAwaitingReply = "DesignCoordinationAwaitingReply"
 
-//StatePrepressCoordination represent service state
-const StatePrepressCoordination = "PrepressCoordination"
+	//StatePrepressCoordination represent service state
+	StatePrepressCoordination = "PrepressCoordination"
 
-//StatePrepressCoordinationComplete represent service state
-const StatePrepressCoordinationComplete = "PrepressCoordinationComplete"
+	//StatePrepressCoordinationComplete represent service state
+	StatePrepressCoordinationComplete = "PrepressCoordinationComplete"
 
-//StatePrepressCoordinationAwaitingReply represent service state
-const StatePrepressCoordinationAwaitingReply = "PrepressCoordinationAwaitingReply"
+	//StatePrepressCoordinationAwaitingReply represent service state
+	StatePrepressCoordinationAwaitingReply = "PrepressCoordinationAwaitingReply"
 
-//StatePrinting represent service state
-const StatePrinting = "Printing"
+	//StatePrinting represent service state
+	StatePrinting = "Printing"
 
-//StatePrintedWithDefect represent service state
-const StatePrintedWithDefect = "PrintedWithDefect"
+	//StatePrintedWithDefect represent service state
+	StatePrintedWithDefect = "PrintedWithDefect"
 
-//StatePostPress represent service state
-const StatePostPress = "PostPress"
+	//StatePostPress represent service state
+	StatePostPress = "PostPress"
 
-//StatePrinted represent service state
-const StatePrinted = "Printed"
+	//StatePrinted represent service state
+	StatePrinted = "Printed"
 
-//StateShipped represent service state
-const StateShipped = "Shipped"
+	//StateShipped represent service state
+	StateShipped = "Shipped"
 
-//StateShippedToStorage represent service state
-const StateShippedToStorage = "ShippedToStorage"
+	//StateShippedToStorage represent service state
+	StateShippedToStorage = "ShippedToStorage"
 
-//StateReturned represent service state
-const StateReturned = "Returned"
+	//StateReturned represent service state
+	StateReturned = "Returned"
 
-//StateCancelled represent service state
-const StateCancelled = "Cancelled"
+	//StateCancelled represent service state
+	StateCancelled = "Cancelled"
 
-//StateCancelledWithDefect represent service state
-const StateCancelledWithDefect = "CancelledWithDefect"
+	//StateCancelledWithDefect represent service state
+	StateCancelledWithDefect = "CancelledWithDefect"
 
-//StateRefused represent service state
-const StateRefused = "Refused"
+	//StateRefused represent service state
+	StateRefused = "Refused"
 
-//StateDelivered represent service state
-const StateDelivered = "Delivered"
+	//StateDelivered represent service state
+	StateDelivered = "Delivered"
 
-//StateDeleted represent service state
-// Заказ удален (при переводе заказа в этот статус, заказ просто удаляется из системы)
-const StateDeleted = "Deleted"
+	//StateDeleted represent service state
+	// Заказ удален (при переводе заказа в этот статус, заказ просто удаляется из системы)
+	StateDeleted = "Deleted"
+)
