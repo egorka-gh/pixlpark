@@ -145,6 +145,7 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 	}
 
 	req, err := grab.NewRequest(fl, t.ppOrder.DownloadLink)
+	req = req.WithContext(t.ctx)
 	req.SkipExisting = true
 	req.NoResume = true
 	if err != nil {
