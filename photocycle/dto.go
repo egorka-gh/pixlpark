@@ -1,6 +1,7 @@
 package photocycle
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -11,6 +12,9 @@ import (
 // Repository describes the persistence on dto
 type Repository interface {
 	//ListSource(ctx context.Context, source string) ([]Source, error)
+	CreateOrder(ctx context.Context, o Order) (Order, error)
+	LoadOrder(ctx context.Context, id string) (Order, error)
+	LogState(ctx context.Context, orderID string, state int, message string)
 	Close()
 }
 
@@ -60,6 +64,8 @@ type PrintGroup struct {
 	IsDuplex  bool      `json:"is_duplex" db:"is_duplex"`
 	Butt      int       `json:"butt" db:"butt"`
 }
+
+//TODO add print_group_file
 
 //FromPPOrder converts PP order to photocycle order
 func FromPPOrder(o pp.Order, source int, sufix string) Order {
