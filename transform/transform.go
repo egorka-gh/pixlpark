@@ -60,7 +60,7 @@ func (t *Transform) IsComplete() bool {
 }
 
 // Cancel cancels the transform by canceling the underlying Context for
-// this Transform. Cancel blocks until the transfer is closed and returns any
+// this Transform. Cancel blocks until the transform is closed and returns any
 // error - typically context.Canceled.
 //TODO recheck, if there is no cancelabel context will blocks until done
 func (t *Transform) Cancel() error {

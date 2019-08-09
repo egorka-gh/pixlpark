@@ -14,7 +14,8 @@ type Repository interface {
 	//ListSource(ctx context.Context, source string) ([]Source, error)
 	CreateOrder(ctx context.Context, o Order) (Order, error)
 	LoadOrder(ctx context.Context, id string) (Order, error)
-	LogState(ctx context.Context, orderID string, state int, message string)
+	LogState(ctx context.Context, orderID string, state int, message string) error
+	SetOrderState(ctx context.Context, orderID string, state int) error
 	Close()
 }
 

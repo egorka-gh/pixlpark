@@ -99,7 +99,7 @@ func (fc *Factory) run(t *Transform, f stateFunc) {
 
 func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 	//pp.StatePrepressCoordination
-	orders, err := fc.ppClient.GetOrders(t.ctx, pp.StateReadyToProcessing, 0, 0, 10, 0)
+	orders, err := fc.ppClient.GetOrders(t.ctx, statePixelStartLoad, 0, 0, 10, 0)
 	if err != nil {
 		t.err = err
 		return fc.closeTransform
@@ -113,11 +113,10 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 		if co.State == pc.StateCanceledPHCycle {
 			//cancel in pp
 			//ignore errors
-			fc.ppClient.AddOrderComment(t.ctx, po.ID, fc.ppUser, "Заказ отменен в PhotoCycle")
-			fc.ppClient.SetOrderStatus(t.ctx, po.ID, pp.StatePrintedWithDefect, false)
+			fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle")
 			continue
 		}
-		err := fc.ppClient.SetOrderStatus(t.ctx, po.ID, pp.StatePrepressCoordination, false)
+		err := fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false)
 		if err != nil {
 			continue
 		}
@@ -126,42 +125,57 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 		t.pcBaseOrder = co
 		return nil
 	}
-	t.err = ErrEmptyQueue(fmt.Errorf("No orders in state %s", pp.StateReadyToProcessing))
+	t.err = ErrEmptyQueue(fmt.Errorf("No orders in state %s", statePixelStartLoad))
 	return fc.closeTransform
 }
 
-//start grab to load zip
+//start grab client to load zip
 func (fc *Factory) loadZIP(t *Transform) stateFunc {
 	loader := grab.NewClient()
 	fl := filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip")
 	//check delete old zip & folder
-	if err := os.Remove(fl); !os.IsNotExist(err) {
+	if err := os.Remove(fl); err != nil && !os.IsNotExist(err) {
 		t.err = err
-		return fc.closeTransform
 	}
-	if err := os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID)); !os.IsNotExist(err) {
+	if err := os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID)); err != nil && !os.IsNotExist(err) {
 		t.err = err
+	}
+	if t.err != nil {
+		//filesystem err
+		//reset && close
+		fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки:"+t.err.Error())
+		fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrFileSystem, t.err.Error())
 		return fc.closeTransform
 	}
 
 	req, err := grab.NewRequest(fl, t.ppOrder.DownloadLink)
+	if err != nil {
+		t.err = err
+		fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
+		fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrWeb, t.err.Error())
+		return fc.closeTransform
+	}
 	req = req.WithContext(t.ctx)
 	req.SkipExisting = true
 	req.NoResume = true
-	if err != nil {
-		t.err = err
-		return fc.closeTransform
-	}
 	t.loader = loader.Do(req)
 	//waite till complete
-	err = t.loader.Err()
-	if err != nil {
+	t.err = t.loader.Err()
+	if t.err != nil {
 		//TODO err limiter
-		t.err = err
+		fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
+		fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrWeb, t.err.Error())
 		return fc.closeTransform
 	}
 
-	//TODO forvard to unzip
+	//forvard to unzip
+	return fc.unzip
+}
+
+//start grab client to load zip
+func (fc *Factory) unzip(t *Transform) stateFunc {
+
+	//TODO forvard to transform
 	//dummy stop
 	return fc.closeTransform
 }
@@ -193,6 +207,28 @@ func (fc *Factory) closeTransform(t *Transform) stateFunc {
 	}
 
 	return nil
+}
+
+func (fc *Factory) setPixelState(t *Transform, state, message string) error {
+	var err error
+	if state != "" {
+		err = fc.ppClient.SetOrderStatus(t.ctx, t.ppOrder.ID, state, false)
+	}
+	if message != "" {
+		fc.ppClient.AddOrderComment(t.ctx, t.ppOrder.ID, fc.ppUser, message)
+	}
+	return err
+}
+
+func (fc *Factory) setCycleState(t *Transform, state int, logState int, message string) error {
+	var err error
+	if state != 0 {
+		err = fc.pcClient.SetOrderState(t.ctx, t.pcBaseOrder.ID, state)
+	}
+	if message != "" {
+		fc.pcClient.LogState(t.ctx, t.pcBaseOrder.ID, logState, message)
+	}
+	return err
 }
 
 //ErrEmptyQueue - no orders to transform

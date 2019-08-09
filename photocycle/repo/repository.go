@@ -68,3 +68,9 @@ func (b *basicRepository) LogState(ctx context.Context, orderID string, state in
 	_, err := b.db.ExecContext(ctx, ssql, orderID, state, message)
 	return err
 }
+
+func (b *basicRepository) SetOrderState(ctx context.Context, orderID string, state int) error {
+	ssql := "UPDATE orders o SET o.state = ?, o.state_date = Now() WHERE o.id = ?"
+	_, err := b.db.ExecContext(ctx, ssql, state, orderID)
+	return err
+}
