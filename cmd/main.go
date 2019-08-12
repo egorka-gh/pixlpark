@@ -2,11 +2,18 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"time"
+
+	"github.com/egorka-gh/pixlpark/transform"
+
+	"github.com/egorka-gh/pixlpark/photocycle/repo"
 
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/pixlpark/service"
 	log "github.com/go-kit/kit/log"
+	_ "github.com/go-sql-driver/mysql"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -46,6 +53,35 @@ func main() {
 	oauthClient := cnf.Client(context.Background(), nil)
 	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
+	rep, err := repo.New("root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true")
+	if err != nil {
+		logger.Log("Open database error", err.Error())
+		return
+	}
+	fc := transform.NewFactory(ttClient, rep, 33, "D:\\Buffer\\pp\\wrk", "D:\\Buffer\\pp\\res", "photo.cycle@yandex.by", log.With(logger, "thread", "factory"))
+
+	transf := &transform.Transform{}
+	transf = fc.ResetStarted(context.Background())
+	transf = fc.Do(context.Background())
+
+	// start UI loop
+	t := time.NewTicker(500 * time.Millisecond)
+Loop:
+	for {
+		select {
+		case <-t.C:
+			fmt.Printf("  download speed %v\n", transf.BytesPerSecond())
+		case <-transf.Done:
+			// download is complete
+			break Loop
+		}
+	}
+	t.Stop()
+
+	err = transf.Err()
+	if err != nil {
+		logger.Log("Transform error", err.Error())
+	}
 
 	/*
 		err := ttClient.SetOrderStatus(context.Background(), "1850708", "ReadyToProcessing", false) //DesignCoordination //ReadyToProcessing
@@ -67,10 +103,12 @@ func main() {
 		}
 	*/
 
-	err := ttClient.AddOrderComment(context.Background(), "1850708", "egorka@tut.by", "test add comment 2")
-	if err != nil {
-		logger.Log("AddOrderComment error", err.Error())
-	}
+	/*
+		err := ttClient.AddOrderComment(context.Background(), "1850708", "egorka@tut.by", "test add comment 2")
+		if err != nil {
+			logger.Log("AddOrderComment error", err.Error())
+		}
+	*/
 	/*
 		loadZip := false
 		orders, err := ttClient.GetOrders(context.Background(), "", 0, 0, 0, 0)

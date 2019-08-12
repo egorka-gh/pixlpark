@@ -27,6 +27,10 @@ func unzip(archive, target string) error {
 			continue
 		}
 
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			return err
+		}
+
 		fileReader, err := file.Open()
 		if err != nil {
 			return err
@@ -74,5 +78,10 @@ func replaceRootPath(oldPath, root string) string {
 }
 
 func main() {
-	dirzip("D:\\Buffer\\tst.zip", "D:\\Buffer\\tst")
+	//dirzip("D:\\Buffer\\tst.zip", "D:\\Buffer\\tst")
+	err := unzip("D:\\Buffer\\pp\\wrk\\1850708.zip", "D:\\Buffer\\pp\\wrk\\tst")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+	}
+
 }

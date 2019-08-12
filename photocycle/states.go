@@ -1,6 +1,9 @@
 package photocycle
 
 const (
+	//StateErrZip represent photocycle state
+	StateErrZip = -330 //Ошибка zip
+
 	//StateErrEmptyFtp represent photocycle state
 	StateErrEmptyFtp = -329 //Не загружен на FTP
 
@@ -67,6 +70,9 @@ const (
 
 	//StateLoad represent photocycle state
 	StateLoad = 110 //Загрузка
+
+	//StateUnzip represent photocycle state
+	StateUnzip = 118 //Загрузка
 
 	//114	Ожидание проверки
 	//115	Проверка
