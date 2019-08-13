@@ -81,7 +81,7 @@ func main() {
 		}
 	*/
 
-	oid := "1850708"
+	oid := "1845051"
 	items, err := ttClient.GetOrderItems(context.Background(), oid)
 	if err != nil {
 		logger.Log("OrderItemsId", oid, "GetOrderItems error", err.Error())

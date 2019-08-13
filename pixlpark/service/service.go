@@ -144,14 +144,34 @@ type OrderItem struct {
 	AdditionalFields map[string]string `json:"AdditionalFields"`
 	DirectoryName    string            `json:"DirectoryName"`
 	Comment          string            `json:"Comment"`
+	skuMap           map[string]string
+}
+
+//Sku returns map of SkuItems (Name->Value)
+//it joins OrderItem and Options SkuItems, Options.SkuItems owerwrites Values vs same key if any
+func (i OrderItem) Sku() map[string]string {
+	if i.skuMap != nil {
+		return i.skuMap
+	}
+	i.skuMap = make(map[string]string)
+	for _, sku := range i.SkuItems {
+		i.skuMap[sku.Name] = sku.Value
+	}
+	for _, opt := range i.Options {
+		for _, sku := range opt.SkuItems {
+			i.skuMap[sku.Name] = sku.Value
+		}
+	}
+	return i.skuMap
 }
 
 // OrderItemOption represent pp Order Item Option
 type OrderItemOption struct {
-	Title           string  `json:"Title"`
-	Description     string  `json:"Description"`
-	Price           float64 `json:"Price"`
-	PriceFormatType string  `json:"PriceFormatType"`
+	Title           string         `json:"Title"`
+	Description     string         `json:"Description"`
+	Price           float64        `json:"Price"`
+	PriceFormatType string         `json:"PriceFormatType"`
+	SkuItems        []OrderItemSku `json:"SkuItems"`
 }
 
 // OrderItemSku represent pp Order Item SKU
