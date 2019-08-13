@@ -1,9 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	http1 "net/http"
 	"net/url"
@@ -154,14 +156,14 @@ func decodeGetOrderItemsResponse(_ context.Context, r *http1.Response) (interfac
 		return nil, statusError(r.StatusCode)
 	}
 	var resp GetOrderItemsResponse
-	/* to debug response
+	/* to debug response */
 	var raw bytes.Buffer
 	tee := io.TeeReader(r.Body, &raw)
 	err := json.NewDecoder(tee).Decode(&resp)
 	resp.RawResponse = raw.String()
 	fmt.Println(resp.RawResponse)
-	*/
-	err := json.NewDecoder(r.Body).Decode(&resp)
+	/**/
+	//err := json.NewDecoder(r.Body).Decode(&resp)
 	return resp, err
 }
 

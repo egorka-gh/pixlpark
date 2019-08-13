@@ -156,6 +156,6 @@ type OrderItemOption struct {
 
 // OrderItemSku represent pp Order Item SKU
 type OrderItemSku struct {
-	Name  string `json:"Title"`
-	Value string `json:"Description"`
+	Name  string `json:"Name"`
+	Value string `json:"Value"`
 }

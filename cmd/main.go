@@ -4,11 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
-
-	"github.com/egorka-gh/pixlpark/transform"
-
-	"github.com/egorka-gh/pixlpark/photocycle/repo"
 
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/pixlpark/service"
@@ -53,34 +48,45 @@ func main() {
 	oauthClient := cnf.Client(context.Background(), nil)
 	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
-	rep, err := repo.New("root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true")
-	if err != nil {
-		logger.Log("Open database error", err.Error())
-		return
-	}
-	fc := transform.NewFactory(ttClient, rep, 33, "D:\\Buffer\\pp\\wrk", "D:\\Buffer\\pp\\res", "photo.cycle@yandex.by", log.With(logger, "thread", "factory"))
 
-	transf := &transform.Transform{}
-	transf = fc.ResetStarted(context.Background())
-	transf = fc.Do(context.Background())
-
-	// start UI loop
-	t := time.NewTicker(500 * time.Millisecond)
-Loop:
-	for {
-		select {
-		case <-t.C:
-			fmt.Printf("  download speed %v\n", transf.BytesPerSecond())
-		case <-transf.Done:
-			// download is complete
-			break Loop
+	/* factory test
+		rep, err := repo.New("root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true")
+		if err != nil {
+			logger.Log("Open database error", err.Error())
+			return
 		}
-	}
-	t.Stop()
+		fc := transform.NewFactory(ttClient, rep, 33, "D:\\Buffer\\pp\\wrk", "D:\\Buffer\\pp\\res", "photo.cycle@yandex.by", log.With(logger, "thread", "factory"))
 
-	err = transf.Err()
+		transf := &transform.Transform{}
+		transf = fc.ResetStarted(context.Background())
+		transf = fc.Do(context.Background())
+
+		// start UI loop
+		t := time.NewTicker(500 * time.Millisecond)
+	Loop:
+		for {
+			select {
+			case <-t.C:
+				fmt.Printf("  download speed %v\n", transf.BytesPerSecond())
+			case <-transf.Done:
+				// download is complete
+				break Loop
+			}
+		}
+		t.Stop()
+
+		err = transf.Err()
+		if err != nil {
+			logger.Log("Transform error", err.Error())
+		}
+	*/
+
+	oid := "1850708"
+	items, err := ttClient.GetOrderItems(context.Background(), oid)
 	if err != nil {
-		logger.Log("Transform error", err.Error())
+		logger.Log("OrderItemsId", oid, "GetOrderItems error", err.Error())
+	} else {
+		logger.Log("OrderItemsId", oid, "Responce", fmt.Sprintf("%+v", items))
 	}
 
 	/*
