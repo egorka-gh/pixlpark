@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -99,6 +100,7 @@ type Order struct {
 	DiscountTitle        string          `json:"DiscountTitle"`
 	DateCreated          Date            `json:"DateCreated,string"`
 	DateModified         Date            `json:"DateModified,string"`
+	Items                []OrderItem     `json:"-"`
 }
 
 // DeliveryAddress represent pp DeliveryAddress
@@ -155,11 +157,11 @@ func (i OrderItem) Sku() map[string]string {
 	}
 	i.skuMap = make(map[string]string)
 	for _, sku := range i.SkuItems {
-		i.skuMap[sku.Name] = sku.Value
+		i.skuMap[strings.ToLower(sku.Name)] = sku.Value
 	}
 	for _, opt := range i.Options {
 		for _, sku := range opt.SkuItems {
-			i.skuMap[sku.Name] = sku.Value
+			i.skuMap[strings.ToLower(sku.Name)] = sku.Value
 		}
 	}
 	return i.skuMap

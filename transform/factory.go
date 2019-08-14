@@ -151,10 +151,12 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 			//cancel in pp
 			//ignore errors
 			fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle")
+			//keep fetching
 			continue
 		}
-		err := fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false)
-		if err != nil {
+
+		if err = fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false); err != nil {
+			//keep fetching
 			continue
 		}
 		//сan load stop fetching
@@ -330,6 +332,32 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 	}
 
 	//TODO forvard to transform
+	//dummy stop
+	return fc.transformItems
+}
+
+//transformItems transforms orderitems to cycle orders
+func (fc *Factory) transformItems(t *Transform) stateFunc {
+	var err error
+	if t.ppOrder.Items, err = fc.ppClient.GetOrderItems(t.ctx, t.ppOrder.ID); err != nil {
+		//TODO restart?
+		t.err = err
+		fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
+		fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrFileSystem, t.err.Error())
+		return fc.closeTransform
+	}
+
+	for _, item := range t.ppOrder.Items {
+		//process item
+
+		//try build by alias
+		alias := item.Sku()["alias"]
+		if alias == "" {
+			//TODO some other
+		}
+	}
+
+	//TODO forvard to ?
 	//dummy stop
 	return fc.closeTransform
 }

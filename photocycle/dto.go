@@ -16,10 +16,19 @@ type Repository interface {
 	LoadOrder(ctx context.Context, id string) (Order, error)
 	LogState(ctx context.Context, orderID string, state int, message string) error
 	SetOrderState(ctx context.Context, orderID string, state int) error
+	LoadAlias(ctx context.Context, alias string) (Alias, error)
 	Close()
 }
 
-//Order represents the Order of db object
+//Alias represents the book_synonym db object
+type Alias struct {
+	ID      int    `json:"id" db:"id"`
+	Alias   string `json:"synonym" db:"synonym"`
+	Type    int    `json:"book_type" db:"book_type"`
+	SubType int    `json:"synonym_type" db:"synonym_type"`
+}
+
+//Order represents the Order db object
 type Order struct {
 	ID          string    `json:"id" db:"id"`
 	Source      int       `json:"source" db:"source"`
@@ -82,5 +91,6 @@ func FromPPOrder(o pp.Order, source int, sufix string) Order {
 		DataTS:     time.Time(o.DateModified),
 		GroupID:    g,
 		ClientID:   o.UserID, //??
+		FtpFolder:  fmt.Sprintf("%s%s", o.ID, sufix),
 	}
 }
