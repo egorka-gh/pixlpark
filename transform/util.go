@@ -2,10 +2,9 @@ package transform
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -46,61 +45,37 @@ func folderOpen(path string) (*os.File, error) {
 	return file, nil
 }
 
-func folderList(path string) ([]fileCopy, error) {
-
-	f, err := folderOpen(path)
+func copyFile(src, dst string) (err error) {
+	sfi, err := os.Stat(src)
 	if err != nil {
-		return []fileCopy{}, err
+		return
 	}
-	defer f.Close()
-
-	list, err := f.Readdir(-1)
-	if err != nil {
-		return []fileCopy{}, err
+	if !sfi.Mode().IsRegular() {
+		// cannot copy non-regular files (e.g., directories,
+		// symlinks, devices, etc.)
+		return fmt.Errorf("CopyFile: non-regular source file %s (%q)", sfi.Name(), sfi.Mode().String())
 	}
 
-	var res = make([]fileCopy, 0, len(list))
-	for _, fi := range list {
-		if !fi.IsDir() {
-			res = append(res, fileCopy{OldName: fi.Name(), Process: allowedExt[filepath.Ext(fi.Name())]})
+	in, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer in.Close()
+
+	//out, err := os.Create(dst)
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, sfi.Mode())
+	if err != nil {
+		return
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
 		}
+	}()
+	if _, err = io.Copy(out, in); err != nil {
+		return
 	}
-	return res, nil
-}
-
-func listIndexItems(list []fileCopy, hasCover bool) error {
-	rep, err := regexp.Compile(`(_preview\.)`)
-	if err != nil {
-		return err
-	}
-	//fmt.Println(re.MatchString("surface_0_preview.png"))
-	rei, err := regexp.Compile(`^surface_\[(\d+)\]`)
-	if err != nil {
-		return err
-	}
-	//m :=re.FindStringSubmatch("surface_[78888](oblozhka)_zone_[0](oblozhka).jpg")
-
-	for i, fi := range list {
-		if fi.Process {
-			if rep.MatchString(fi.OldName) {
-				list[i].Process = false
-			} else {
-				sm := rei.FindStringSubmatch(fi.OldName)
-				if len(sm) != 2 {
-					//TODO error?
-					list[i].Process = false
-				} else {
-					idx, err := strconv.Atoi(sm[1])
-					if err != nil {
-						return err
-					}
-					if !hasCover {
-						idx++
-					}
-					list[i].SheetIdx = idx
-				}
-			}
-		}
-	}
-	return nil
+	err = out.Sync()
+	return
 }

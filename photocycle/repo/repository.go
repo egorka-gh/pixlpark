@@ -77,7 +77,7 @@ func (b *basicRepository) SetOrderState(ctx context.Context, orderID string, sta
 
 func (b *basicRepository) LoadAlias(ctx context.Context, alias string) (cycle.Alias, error) {
 	var res cycle.Alias
-	ssql := "SELECT id, synonym, book_type, synonym_type FROM book_synonym bs WHERE bs.src_type = 4 AND bs.synonym = ? ORDER BY bs.synonym_type DESC"
+	ssql := "SELECT id, synonym, book_type, synonym_type, (SELECT IFNULL(MAX(1), 0) FROM book_pg_template bpt WHERE bpt.book = bs.id AND bpt.book_part IN (1, 3, 4, 5)) has_cover FROM book_synonym bs WHERE bs.src_type = 4 AND bs.synonym = ? ORDER BY bs.synonym_type DESC"
 	err := b.db.GetContext(ctx, &res, ssql, alias)
 	return res, err
 
