@@ -29,6 +29,9 @@ type ErrParce error
 //ErrFileSystem file system error
 type ErrFileSystem error
 
+//ErrRepository file system error
+type ErrRepository error
+
 var (
 	errCantTransform = ErrCantTransform(errors.New("Can't transform"))
 )
@@ -108,6 +111,7 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 		if err != nil {
 			return ErrFileSystem(err)
 		}
+		outPath = path.Join(outPath, alias.Alias)
 		err = os.MkdirAll(outPath, 0755)
 		if err != nil {
 			return ErrFileSystem(err)
@@ -132,7 +136,7 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 		//update order
 		order.FotosNum = toProcess
 		//?? factory has to do it
-		order.State = pc.StateConfirmation
+		//order.State = pc.StateConfirmation
 		//order.StateDate = time.Now()
 	default:
 		return fmt.Errorf("Неподдерживаемый тип %d алиаса '%s'", alias.Type, alias.Alias)

@@ -55,7 +55,7 @@ func main() {
 			logger.Log("Open database error", err.Error())
 			return
 		}
-		fc := transform.NewFactory(ttClient, rep, 33, "D:\\Buffer\\pp\\wrk", "D:\\Buffer\\pp\\res", "photo.cycle@yandex.by", log.With(logger, "thread", "factory"))
+		fc := transform.NewFactory(ttClient, rep, 23, "D:\\Buffer\\pp\\wrk", "D:\\Buffer\\pp\\res", "photo.cycle@yandex.by", log.With(logger, "thread", "factory"))
 
 		transf := &transform.Transform{}
 		transf = fc.ResetStarted(context.Background())

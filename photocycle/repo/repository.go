@@ -36,24 +36,34 @@ func (b *basicRepository) Close() {
 	b.db.Close()
 }
 
-func (b *basicRepository) CreateOrder(ctx context.Context, o cycle.Order) (cycle.Order, error) {
+func (b *basicRepository) CreateOrder(ctx context.Context, o cycle.Order) error {
 
 	//var ssql = "SELECT source, table_name, latest_version FROM cnv_version WHERE source = ? ORDER BY syncorder"
 	var sb strings.Builder
-	sb.WriteString("INSERT IGNORE INTO orders (id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production)")
+	//INSERT IGNORE  ??
+	sb.WriteString("INSERT INTO orders (id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production)")
 	sb.WriteString(" VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)")
 	var ssql = sb.String()
 	_, err := b.db.ExecContext(ctx, ssql, o.ID, o.Source, o.SourceID, o.SourceDate, o.DataTS, o.State, o.GroupID, o.FtpFolder, o.FotosNum, o.ClientID, o.Production)
-	if err != nil {
-		return cycle.Order{}, err
-	}
+	return err
 	/*
 		//ignore ErrNoRows ??
 		if err != nil && err == sql.ErrNoRows {
 			return res, nil
 		}
 	*/
-	return b.LoadOrder(ctx, o.ID)
+}
+
+func (b *basicRepository) ClearGroup(ctx context.Context, group int, keepID string) error {
+	sql := "DELETE FROM orders WHERE group_id = ? AND ID != ?"
+	_, err := b.db.ExecContext(ctx, sql, group, keepID)
+	return err
+}
+
+func (b *basicRepository) SetGroupState(ctx context.Context, state, group int, keepID string) error {
+	sql := "UPDATE orders SET state = ? WHERE group_id = ? AND ID != ?"
+	_, err := b.db.ExecContext(ctx, sql, state, group, keepID)
+	return err
 }
 
 func (b *basicRepository) LoadOrder(ctx context.Context, id string) (cycle.Order, error) {

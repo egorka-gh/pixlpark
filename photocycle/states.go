@@ -25,7 +25,9 @@ const (
 
 	//-317	Ошибка удаленной загрузки
 	//-316	Ошибка удаленной подготовки
-	//-315	Ошибка подготовки
+
+	//StateErrPreprocess represent photocycle state
+	StateErrPreprocess = -315 //Ошибка подготовки
 
 	//StateErrFileSystem represent photocycle state
 	StateErrFileSystem = -314 //Ошибка файловой системы
@@ -92,7 +94,10 @@ const (
 	//157	Заблокирован для подготовки
 	//160	Ресайз
 	//165	Подготовка книги
-	//170	Ошибка подготовки
+
+	//StatePreprocessIncomplite represent photocycle state
+	StatePreprocessIncomplite = 170 //Ошибка подготовки
+
 	//180	Подготовка завершена
 
 	//StateConfirmation represent photocycle state

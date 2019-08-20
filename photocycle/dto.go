@@ -12,11 +12,13 @@ import (
 // Repository describes the persistence on dto
 type Repository interface {
 	//ListSource(ctx context.Context, source string) ([]Source, error)
-	CreateOrder(ctx context.Context, o Order) (Order, error)
+	CreateOrder(ctx context.Context, o Order) error
 	LoadOrder(ctx context.Context, id string) (Order, error)
 	LogState(ctx context.Context, orderID string, state int, message string) error
 	SetOrderState(ctx context.Context, orderID string, state int) error
 	LoadAlias(ctx context.Context, alias string) (Alias, error)
+	ClearGroup(ctx context.Context, group int, keepID string) error
+	SetGroupState(ctx context.Context, state, group int, keepID string) error
 	Close()
 }
 

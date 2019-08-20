@@ -145,7 +145,8 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 		fc.log("fetch", po.ID)
 		co := pc.FromPPOrder(po, fc.source, "@")
 		co.State = pc.StateLoadWaite
-		co, _ = fc.pcClient.CreateOrder(t.ctx, co)
+		_ = fc.pcClient.CreateOrder(t.ctx, co)
+		co, _ = fc.pcClient.LoadOrder(t.ctx, co.ID)
 		//TODO load/check state from all orders by group?
 		if co.State == pc.StateCanceledPHCycle {
 			//cancel in pp
@@ -339,6 +340,7 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 //transformItems transforms orderitems to cycle orders
 func (fc *Factory) transformItems(t *Transform) stateFunc {
 	var err error
+	//TODO  don't need store in t.ppOrder.Items
 	if t.ppOrder.Items, err = fc.ppClient.GetOrderItems(t.ctx, t.ppOrder.ID); err != nil {
 		//TODO restart?
 		t.err = err
@@ -347,18 +349,86 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		return fc.closeTransform
 	}
 
+	//TODO check if cycle allready print suborder??
+	//TODO  don't need store in t.pcOrders
+	t.pcOrders = make([]pc.Order, 0, len(t.ppOrder.Items))
+	incomlete := false
 	for _, item := range t.ppOrder.Items {
 		//process item
 
 		//try build by alias
 		alias := item.Sku()["alias"]
-		if alias == "" {
+		if alias != "" {
+			co := pc.FromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", item.ID))
+			err = fc.transformAlias(t.ctx, item, &co)
+			if err != nil {
+				incomlete = true
+				msg := fmt.Sprintf("Элемент заказа %d '%s' не обработан. Ошибка %s", item.ID, item.Name, err.Error())
+				fc.setPixelState(t, "", msg)
+				fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
+			} else {
+				co.State = pc.StateConfirmation
+				t.pcOrders = append(t.pcOrders, co)
+			}
+		} else {
 			//TODO some other
+			incomlete = true
+			msg := fmt.Sprintf("Элемент заказа %d '%s' не обработан. Для продукта не настроены параметры подготовки", item.ID, item.Name)
+			fc.setPixelState(t, "", msg)
+			fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
 		}
+	}
+	if incomlete {
+		msg := "Часть элементов заказа не обработано. Заказ не размещен в Photocycle"
+		fc.setPixelState(t, statePixelWaiteConfirm, msg)
+		fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrPreprocess, msg)
+	} else {
+		//clear sub orders
+		err = fc.pcClient.ClearGroup(t.ctx, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
+		if err != nil {
+			t.err = ErrRepository(err)
+			fc.setPixelState(t, statePixelWaiteConfirm, fmt.Sprintf("Ошибка БД: %s", err.Error()))
+			fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrWrite, err.Error())
+			return fc.closeTransform
+		}
+		//create sub orders in  pc.StateConfirmation
+		for _, co := range t.pcOrders {
+			err = fc.pcClient.CreateOrder(t.ctx, co)
+			if err != nil {
+				t.err = ErrRepository(err)
+				fc.setPixelState(t, statePixelWaiteConfirm, fmt.Sprintf("Ошибка БД: %s", err.Error()))
+				fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrWrite, err.Error())
+				return fc.closeTransform
+			}
+		}
+
+		//finalase
+		//TODO check production
+		//set state in pp
+		err = fc.ppClient.SetOrderStatus(t.ctx, t.ppOrder.ID, pp.StatePrinting, true)
+		if err != nil {
+			//TODO report err??
+			t.err = err
+			//fc.setPixelState(t, statePixelWaiteConfirm, fmt.Sprintf("Ошибка БД: %s", err.Error()))
+			fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrWeb, fmt.Sprintf("Ошибка смены статуса на сайте. Статус:%s; Ошибка:%s ", pp.StatePrinting, err.Error()))
+			return fc.closeTransform
+		}
+		//move all to waite print state
+		err = fc.pcClient.SetGroupState(t.ctx, pc.StatePrintWaite, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
+		if err != nil {
+			//TODO report err??
+			t.err = ErrRepository(err)
+			fc.setPixelState(t, "", fmt.Sprintf("Ошибка БД: %s", err.Error()))
+			fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrWrite, err.Error())
+			return fc.closeTransform
+		}
+
+		//move main to complite state
+		fc.setCycleState(t, pc.StateSkiped, 0, "")
 	}
 
 	//TODO forvard to ?
-	//dummy stop
+	//stop
 	return fc.closeTransform
 }
 
