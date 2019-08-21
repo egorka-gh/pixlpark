@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
+	"github.com/egorka-gh/pixlpark/photocycle/repo"
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/pixlpark/service"
+	"github.com/egorka-gh/pixlpark/transform"
 	log "github.com/go-kit/kit/log"
 	_ "github.com/go-sql-driver/mysql"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
@@ -49,6 +50,20 @@ func main() {
 	//ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, logger), defaultHTTPMiddleware(logger))
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
 
+	/* factory test by Order Id */
+	rep, err := repo.New("root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true")
+	if err != nil {
+		logger.Log("Open database error", err.Error())
+		return
+	}
+	fc := transform.NewFactory(ttClient, rep, 23, "D:\\Buffer\\pp\\wrk", "D:\\Buffer\\pp\\res", "photo.cycle@yandex.by", log.With(logger, "thread", "factory"))
+	oid := "1874839&&"
+	transf := fc.DoOrder(context.Background(), oid)
+	err = transf.Err()
+	if err != nil {
+		logger.Log("Transform error", err.Error())
+	}
+
 	/* factory test
 		rep, err := repo.New("root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true")
 		if err != nil {
@@ -81,13 +96,15 @@ func main() {
 		}
 	*/
 
-	oid := "1845051"
-	items, err := ttClient.GetOrderItems(context.Background(), oid)
-	if err != nil {
-		logger.Log("OrderItemsId", oid, "GetOrderItems error", err.Error())
-	} else {
-		logger.Log("OrderItemsId", oid, "Responce", fmt.Sprintf("%+v", items))
-	}
+	/*
+		oid := "1845051"
+		items, err := ttClient.GetOrderItems(context.Background(), oid)
+		if err != nil {
+			logger.Log("OrderItemsId", oid, "GetOrderItems error", err.Error())
+		} else {
+			logger.Log("OrderItemsId", oid, "Responce", fmt.Sprintf("%+v", items))
+		}
+	*/
 
 	/*
 		err := ttClient.SetOrderStatus(context.Background(), "1850708", "ReadyToProcessing", false) //DesignCoordination //ReadyToProcessing

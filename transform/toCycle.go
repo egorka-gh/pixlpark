@@ -29,8 +29,11 @@ type ErrParce error
 //ErrFileSystem file system error
 type ErrFileSystem error
 
-//ErrRepository file system error
+//ErrRepository lokal data base error
 type ErrRepository error
+
+//ErrService PP servise error
+type ErrService error
 
 var (
 	errCantTransform = ErrCantTransform(errors.New("Can't transform"))
@@ -40,6 +43,7 @@ type fileCopy struct {
 	OldName  string
 	NewName  string
 	Process  bool
+	NoCopy   bool
 	SheetIdx int
 	BookIdx  int
 }
@@ -125,8 +129,9 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 			default:
 				// keep working
 			}
-			//TODO copy only vs Process ??
-			//if list[i].Process {
+			if fi.NoCopy {
+				continue
+			}
 			err = copyFile(path.Join(basePath, fi.OldName), path.Join(outPath, fi.NewName))
 			if err != nil {
 				return ErrFileSystem(err)
@@ -184,6 +189,7 @@ func listIndexItems(list []fileCopy, hasCover bool) error {
 			if rep.MatchString(fi.OldName) {
 				//exclude preview
 				list[i].Process = false
+				list[i].NoCopy = true
 			} else {
 				//get surface index
 				sm := rei.FindStringSubmatch(fi.OldName)
