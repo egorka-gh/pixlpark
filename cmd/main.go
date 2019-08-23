@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/egorka-gh/pixlpark/photocycle/repo"
@@ -10,17 +11,35 @@ import (
 	"github.com/egorka-gh/pixlpark/transform"
 	log "github.com/go-kit/kit/log"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/kardianos/osext"
+	"github.com/spf13/viper"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
 
-	logger := initLoger("")
+	if err := readConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found; ignore error if desired
+			fmt.Println("Start using default setings")
+		} else {
+			fmt.Println(err.Error())
+			return
+		}
+	}
+
+	//TODO check settings
+	if viper.GetInt("source.id") == 0 {
+		fmt.Println("Source ID is not set")
+		return
+	}
+
+	logger := initLoger(viper.GetString("folders.log"))
 	/* */
 	//http://api.pixlpark.com
 	cnf := &oauth.Config{
-		PublicKey:  "aac2028cc33c4970b9e1a829ca7acd7b",
-		PrivateKey: "0227f3943b214603b7fa9431a09b325d",
+		PublicKey:  viper.GetString("pixelpark.oauth.PublicKey"),
+		PrivateKey: viper.GetString("pixelpark.oauth.PrivateKey"),
 		Endpoint: oauth.Endpoint{
 			RequestURL: "http://api.pixlpark.com/oauth/requesttoken",
 			RefreshURL: "http://api.pixlpark.com/oauth/refreshtoken",
@@ -51,12 +70,12 @@ func main() {
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
 
 	/* factory test by Order Id */
-	rep, err := repo.New("root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true")
+	rep, err := repo.New(viper.GetString("mysql"))
 	if err != nil {
 		logger.Log("Open database error", err.Error())
 		return
 	}
-	fc := transform.NewFactory(ttClient, rep, 23, "D:\\Buffer\\pp\\wrk", "D:\\Buffer\\pp\\res", "photo.cycle@yandex.by", log.With(logger, "thread", "factory"))
+	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("pixelpark.user"), log.With(logger, "thread", "factory"))
 	oid := "1874839&&"
 	transf := fc.DoOrder(context.Background(), oid)
 	err = transf.Err()
@@ -251,4 +270,33 @@ func initLoger(logPath string) log.Logger {
 	logger = log.With(logger, "caller", log.DefaultCaller)
 
 	return logger
+}
+
+//ReadConfig init/read viper config
+func readConfig() error {
+
+	viper.SetDefault("mysql", "root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true") //MySQL connection string
+	viper.SetDefault("source.id", 23)                                                         //photocycle source id
+	viper.SetDefault("folders.zip", "D:\\Buffer\\pp\\wrk")                                    //work folder for loaded  and unpacked zips
+	viper.SetDefault("folders.in", "D:\\Buffer\\ftp\\in\\PXP")                                //cycle work folder (in ftp)
+	viper.SetDefault("folders.prn", "")                                                       //cycle print folder (out)
+	viper.SetDefault("folders.log", "")                                                       //Log folder
+	viper.SetDefault("pixelpark.user", "photo.cycle@yandex.by")                               //pixelpark user email to post messages to api
+	viper.SetDefault("pixelpark.oauth.PublicKey", "aac2028cc33c4970b9e1a829ca7acd7b")         //oauth PublicKey
+	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey
+
+	path, err := osext.ExecutableFolder()
+	if err != nil {
+		path = "."
+	}
+	//fmt.Println("Path ", path)
+	viper.AddConfigPath(path)
+	viper.SetConfigName("config")
+	return viper.ReadInConfig()
+	/*
+		if err != nil {
+			logger.Info(err)
+			logger.Info("Start using default setings")
+		}
+	*/
 }

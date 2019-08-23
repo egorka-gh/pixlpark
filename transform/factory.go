@@ -407,7 +407,8 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 	fc.log("transformItems", t.ppOrder.ID)
 
 	//TODO  don't need store in t.ppOrder.Items
-	if t.ppOrder.Items, err = fc.ppClient.GetOrderItems(t.ctx, t.ppOrder.ID); err != nil {
+	items, err := fc.ppClient.GetOrderItems(t.ctx, t.ppOrder.ID)
+	if err != nil {
 		//TODO restart?
 		t.err = err
 		fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
@@ -417,13 +418,15 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 
 	//TODO check if cycle allready print suborder??
 	//TODO  don't need store in t.pcOrders
-	t.pcOrders = make([]pc.Order, 0, len(t.ppOrder.Items))
+	//t.pcOrders = make([]pc.Order, 0, len(t.ppOrder.Items))
+	orders := make([]pc.Order, 0, len(items))
 	incomlete := false
-	for _, item := range t.ppOrder.Items {
+	for i, item := range items {
 		//process item
 		fc.log("item", fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID))
 		//create cycle order
-		co := pc.FromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", item.ID))
+		co := pc.FromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", i))
+		co.SourceID = fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID)
 		//try build by alias
 		alias := item.Sku()["alias"]
 		if alias != "" {
@@ -436,7 +439,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 				fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
 			} else {
 				co.State = pc.StateConfirmation
-				t.pcOrders = append(t.pcOrders, co)
+				orders = append(orders, co)
 			}
 		} else {
 			//TODO some other
@@ -462,7 +465,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 			return fc.closeTransform
 		}
 		//create sub orders in  pc.StateConfirmation
-		for _, co := range t.pcOrders {
+		for _, co := range orders {
 			err = fc.pcClient.CreateOrder(t.ctx, co)
 			if err != nil {
 				t.err = ErrRepository(err)

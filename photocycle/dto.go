@@ -89,7 +89,7 @@ func FromPPOrder(o pp.Order, source int, sufix string) Order {
 	return Order{
 		ID:         fmt.Sprintf("%d_%s%s", source, o.ID, sufix),
 		Source:     source,
-		SourceID:   fmt.Sprintf("%s%s", o.ID, sufix),
+		SourceID:   o.ID,
 		SourceDate: time.Time(o.DateCreated),
 		DataTS:     time.Time(o.DateModified),
 		GroupID:    g,

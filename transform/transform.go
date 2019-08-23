@@ -19,7 +19,7 @@ type Transform struct {
 	pcBaseOrder pc.Order
 
 	//pcOrders photocycle orders transform result, pixelpark order items transformed to photocycle orders
-	pcOrders []pc.Order
+	//pcOrders []pc.Order
 
 	// Start specifies the time at which the file transfer started.
 	Start time.Time

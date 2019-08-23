@@ -100,7 +100,7 @@ type Order struct {
 	DiscountTitle        string          `json:"DiscountTitle"`
 	DateCreated          Date            `json:"DateCreated,string"`
 	DateModified         Date            `json:"DateModified,string"`
-	Items                []OrderItem     `json:"-"`
+	//Items                []OrderItem     `json:"-"`
 }
 
 // DeliveryAddress represent pp DeliveryAddress
