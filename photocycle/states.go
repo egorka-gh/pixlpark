@@ -74,7 +74,10 @@ const (
 	StateLoad = 110 //Загрузка
 
 	//StateUnzip represent photocycle state
-	StateUnzip = 118 //Загрузка
+	StateUnzip = 118 //Распаковка zip
+
+	//StateTransform represent photocycle state
+	StateTransform = 119 //Преобразование PP
 
 	//114	Ожидание проверки
 	//115	Проверка
@@ -89,7 +92,7 @@ const (
 	//146	Захвачен на перепечатку
 
 	//StatePreprocessWaite represent photocycle state
-	StatePreprocessWaite =150	//Ожидание подготовки
+	StatePreprocessWaite = 150 //Ожидание подготовки
 
 	//151	Подготовить в первую очередь
 	//155	Проверка web статуса

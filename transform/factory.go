@@ -332,7 +332,7 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 	req = req.WithContext(t.ctx)
 	req.SkipExisting = true
 	req.NoResume = true
-	fc.setCycleState(t, 0, pc.StateLoad, "")
+	fc.setCycleState(t, 0, pc.StateLoad, "start")
 	t.loader = loader.Do(req)
 	//waite till complete
 	t.err = t.loader.Err()
@@ -342,7 +342,7 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 		fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrWeb, t.err.Error())
 		return fc.closeTransform
 	}
-
+	fc.setCycleState(t, pc.StateLoadComplite, pc.StateLoadComplite, fmt.Sprintf("elapsed=%s; speed=%.2f mb/s", t.loader.Duration().String(), t.loader.BytesPerSecond()/(1024*1024)))
 	//forvard to unzip
 	return fc.unzip
 }
@@ -350,8 +350,9 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 //unpack zip
 func (fc *Factory) unzip(t *Transform) stateFunc {
 	//TODO err limiter??
+	started := time.Now()
 	fc.log("unzip", t.ppOrder.ID)
-	fc.setCycleState(t, 0, pc.StateUnzip, "")
+	fc.setCycleState(t, 0, pc.StateUnzip, "start")
 	reader, err := zip.OpenReader(filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip"))
 	if err != nil {
 		t.err = err
@@ -425,6 +426,8 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 		}
 	}
 
+	fc.setCycleState(t, 0, pc.StateUnzip, fmt.Sprintf("complete elapsed=%s", time.Since(started).String()))
+
 	//TODO forvard to transform
 	//dummy stop
 	return fc.transformItems
@@ -433,7 +436,10 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 //transformItems transforms orderitems to cycle orders
 func (fc *Factory) transformItems(t *Transform) stateFunc {
 	var err error
+	started := time.Now()
+
 	fc.log("transformItems", t.ppOrder.ID)
+	fc.setCycleState(t, 0, pc.StateTransform, "start")
 
 	//TODO  don't need store in t.ppOrder.Items
 	items, err := fc.ppClient.GetOrderItems(t.ctx, t.ppOrder.ID)
@@ -468,7 +474,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 				fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
 			} else {
 				co.ExtraInfo = buildExtraInfo(co, item)
-				co.State = pc.StateConfirmation
+				co.State = pc.StateLoadComplite
 				orders = append(orders, co)
 			}
 		} else {
@@ -528,7 +534,8 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		}
 
 		//move main to complite state
-		fc.setCycleState(t, pc.StateSkiped, 0, "")
+		fc.setCycleState(t, pc.StateSkiped, pc.StateTransform, fmt.Sprintf("complete elapsed=%s", time.Since(started).String()))
+
 		//TODO finalize
 		//kill zip and unziped folder
 	}
@@ -583,7 +590,7 @@ func (fc *Factory) setCycleState(t *Transform, state int, logState int, message 
 	if state != 0 {
 		err = fc.pcClient.SetOrderState(t.ctx, t.pcBaseOrder.ID, state)
 	}
-	if message != "" {
+	if message != "" || logState != 0 {
 		fc.pcClient.LogState(t.ctx, t.pcBaseOrder.ID, logState, message)
 	}
 	return err
