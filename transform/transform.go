@@ -87,8 +87,5 @@ func (t *Transform) Err() error {
 // the number of bytes per second transferred using a
 // simple moving average of the last five seconds.
 func (t *Transform) BytesPerSecond() float64 {
-	if t.loader == nil || t.loader.IsComplete() {
-		return 0
-	}
 	return t.loader.BytesPerSecond()
 }

@@ -2,11 +2,7 @@ package photocycle
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"time"
-
-	pp "github.com/egorka-gh/pixlpark/pixlpark/service"
 )
 
 // Repository describes the persistence on dto
@@ -79,21 +75,3 @@ type PrintGroup struct {
 }
 
 //TODO add print_group_file
-
-//FromPPOrder converts PP order to photocycle order
-func FromPPOrder(o pp.Order, source int, sufix string) Order {
-	g, err := strconv.Atoi(o.ID)
-	if err != nil {
-		g = 0
-	}
-	return Order{
-		ID:         fmt.Sprintf("%d_%s%s", source, o.ID, sufix),
-		Source:     source,
-		SourceID:   o.ID,
-		SourceDate: time.Time(o.DateCreated),
-		DataTS:     time.Time(o.DateModified),
-		GroupID:    g,
-		ClientID:   o.UserID, //??
-		FtpFolder:  fmt.Sprintf("%s%s", o.ID, sufix),
-	}
-}

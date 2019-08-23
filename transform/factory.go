@@ -3,6 +3,7 @@ package transform
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,33 @@ type Factory struct {
 	ppUser      string
 	logger      log.Logger
 }
+
+//internal errors, factory has to make decision what to do (rise error or proceed transform)
+
+//ErrEmptyQueue - no orders to transform
+type ErrEmptyQueue error
+
+//ErrCantTransform inapplicable transform method
+type ErrCantTransform error
+
+//ErrSourceNotFound source file or folder not found
+type ErrSourceNotFound error
+
+//ErrParce parce error (filename or some else text field)
+type ErrParce error
+
+//ErrFileSystem file system error
+type ErrFileSystem error
+
+//ErrRepository lokal data base error
+type ErrRepository error
+
+//ErrService PP servise error
+type ErrService error
+
+var (
+	errCantTransform = ErrCantTransform(errors.New("Can't transform"))
+)
 
 // NewFactory returns a new transform Factory, using provided configuration.
 func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse int, workFolder, resultFolder, pixlparkUserEmail string, logger log.Logger) *Factory {
@@ -135,7 +163,8 @@ func (fc *Factory) ResetStarted(ctx context.Context) *Transform {
 	return nil
 }
 
-// An stateFunc is an action that mutates the state of a Transform and returns
+// An stateFunc is factory unit of work
+// is an action that mutates the state of a Transform and returns
 // the next stateFunc to be called.
 type stateFunc func(*Transform) stateFunc
 
@@ -181,7 +210,7 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 
 	for _, po := range orders {
 		fc.log("fetch", po.ID)
-		co := pc.FromPPOrder(po, fc.source, "@")
+		co := fromPPOrder(po, fc.source, "@")
 		co.State = pc.StateLoadWaite
 		_ = fc.pcClient.CreateOrder(t.ctx, co)
 		co, _ = fc.pcClient.LoadOrder(t.ctx, co.ID)
@@ -218,7 +247,7 @@ func (fc *Factory) getOrder(t *Transform) stateFunc {
 		t.err = ErrService(err)
 		return fc.closeTransform
 	}
-	co := pc.FromPPOrder(po, fc.source, "@")
+	co := fromPPOrder(po, fc.source, "@")
 	co.State = pc.StateLoadWaite
 	_ = fc.pcClient.CreateOrder(t.ctx, co)
 	fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
@@ -249,7 +278,7 @@ func (fc *Factory) resetFetched(t *Transform) stateFunc {
 		doFetch = len(orders) > 0
 		for _, po := range orders {
 			fc.log("resetFetched", po.ID)
-			co := pc.FromPPOrder(po, fc.source, "@")
+			co := fromPPOrder(po, fc.source, "@")
 
 			//TODO load/check state from all orders by group?
 			if co.State == pc.StateCanceledPHCycle {
@@ -425,7 +454,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		//process item
 		fc.log("item", fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID))
 		//create cycle order
-		co := pc.FromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", i))
+		co := fromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", i))
 		co.SourceID = fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID)
 		//try build by alias
 		alias := item.Sku()["alias"]
@@ -557,6 +586,3 @@ func (fc *Factory) setCycleState(t *Transform, state int, logState int, message 
 	}
 	return err
 }
-
-//ErrEmptyQueue - no orders to transform
-type ErrEmptyQueue error

@@ -3,40 +3,16 @@ package transform
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"time"
 
 	pc "github.com/egorka-gh/pixlpark/photocycle"
 	pp "github.com/egorka-gh/pixlpark/pixlpark/service"
-)
-
-//internal errors, factory has to make decision what to do (rise error or proceed transform)
-
-//ErrCantTransform inapplicable transform method
-type ErrCantTransform error
-
-//ErrSourceNotFound source file or folder not found
-type ErrSourceNotFound error
-
-//ErrParce parce error (filename or some else text field)
-type ErrParce error
-
-//ErrFileSystem file system error
-type ErrFileSystem error
-
-//ErrRepository lokal data base error
-type ErrRepository error
-
-//ErrService PP servise error
-type ErrService error
-
-var (
-	errCantTransform = ErrCantTransform(errors.New("Can't transform"))
 )
 
 type fileCopy struct {
@@ -210,4 +186,22 @@ func listIndexItems(list []fileCopy, hasCover bool) error {
 		}
 	}
 	return nil
+}
+
+//FromPPOrder converts PP order to photocycle order
+func fromPPOrder(o pp.Order, source int, sufix string) pc.Order {
+	g, err := strconv.Atoi(o.ID)
+	if err != nil {
+		g = 0
+	}
+	return pc.Order{
+		ID:         fmt.Sprintf("%d_%s%s", source, o.ID, sufix),
+		Source:     source,
+		SourceID:   o.ID,
+		SourceDate: time.Time(o.DateCreated),
+		DataTS:     time.Time(o.DateModified),
+		GroupID:    g,
+		ClientID:   o.UserID, //??
+		FtpFolder:  fmt.Sprintf("%s%s", o.ID, sufix),
+	}
 }
