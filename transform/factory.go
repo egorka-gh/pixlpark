@@ -467,6 +467,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 				fc.setPixelState(t, "", msg)
 				fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
 			} else {
+				co.ExtraInfo = buildExtraInfo(co, item)
 				co.State = pc.StateConfirmation
 				orders = append(orders, co)
 			}
@@ -502,6 +503,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 				fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrWrite, err.Error())
 				return fc.closeTransform
 			}
+			fc.pcClient.AddExtraInfo(t.ctx, co.ExtraInfo)
 		}
 
 		//finalase

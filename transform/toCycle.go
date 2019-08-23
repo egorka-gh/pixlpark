@@ -42,6 +42,7 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 	switch alias.Type {
 	case 1, 2, 3:
 		//book
+		order.HasCover = alias.HasCover
 		//get file list
 		basePath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName)
 		list, err := folderList(basePath)
@@ -203,5 +204,25 @@ func fromPPOrder(o pp.Order, source int, sufix string) pc.Order {
 		GroupID:    g,
 		ClientID:   o.UserID, //??
 		FtpFolder:  fmt.Sprintf("%s%s", o.ID, sufix),
+	}
+}
+
+func buildExtraInfo(forOrder pc.Order, from pp.OrderItem) pc.OrderExtraInfo {
+	sheets := from.PageCount
+	if forOrder.HasCover {
+		sheets = sheets - 1
+	}
+
+	return pc.OrderExtraInfo{
+		ID:      forOrder.ID,
+		GroupID: forOrder.GroupID,
+		Format:  from.Name,
+		Books:   from.Quantity,
+		Sheets:  sheets,
+		Alias:   from.Sku()["alias"],
+		Paper:   from.Sku()["paper"],
+		Remark:  from.Comment,
+		Title:   from.Description,
+		Date:    forOrder.SourceDate,
 	}
 }

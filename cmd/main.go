@@ -76,7 +76,7 @@ func main() {
 		return
 	}
 	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("pixelpark.user"), log.With(logger, "thread", "factory"))
-	oid := "1874839&&"
+	oid := "1874839"
 	transf := fc.DoOrder(context.Background(), oid)
 	err = transf.Err()
 	if err != nil {

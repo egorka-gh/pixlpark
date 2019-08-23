@@ -15,6 +15,7 @@ type Repository interface {
 	LoadAlias(ctx context.Context, alias string) (Alias, error)
 	ClearGroup(ctx context.Context, group int, keepID string) error
 	SetGroupState(ctx context.Context, state, group int, keepID string) error
+	AddExtraInfo(ctx context.Context, ei OrderExtraInfo) error
 	Close()
 }
 
@@ -42,13 +43,32 @@ type Order struct {
 	GroupID     int       `json:"group_id" db:"group_id"`
 	ClientID    int       `json:"client_id" db:"client_id"`
 	Production  int       `json:"production" db:"production"`
+	
+	//4 internal use
+	ExtraInfo   OrderExtraInfo
+	HasCover bool
 }
 
 //OrderExtraInfo represents the OrderExtraInfo of db object
 type OrderExtraInfo struct {
-	ID      string `json:"id" db:"id"`
-	GroupID int    `json:"group_id" db:"group_id"`
-	Weight  int    `json:"weight" db:"weight"`
+	ID            string    `json:"id" db:"id"`
+	GroupID       int       `json:"group_id" db:"group_id"`
+	EndPaper      string    `json:"endpaper" db:"endpaper"`
+	InterLayer    string    `json:"interlayer" db:"interlayer"`
+	Cover         string    `json:"cover" db:"cover"`
+	Format        string    `json:"format" db:"format"`
+	CornerType    string    `json:"corner_type" db:"corner_type"`
+	Kaptal        string    `json:"kaptal" db:"kaptal"`
+	CoverMaterial string    `json:"cover_material" db:"cover_material"`
+	Weight        int       `json:"weight" db:"weight"`
+	Books         int       `json:"books" db:"books"`
+	Sheets        int       `json:"sheets" db:"sheets"`
+	Date          time.Time `json:"date_in" db:"date_in"`
+	BookThickness float32   `json:"book_thickness" db:"book_thickness"`
+	Remark        string    `json:"remark" db:"remark"`
+	Paper         string    `json:"paper" db:"paper"`
+	Alias         string    `json:"calc_alias" db:"calc_alias"`
+	Title         string    `json:"calc_title" db:"calc_title"`
 }
 
 //PrintGroup represents the PrintGroup of db object

@@ -90,5 +90,14 @@ func (b *basicRepository) LoadAlias(ctx context.Context, alias string) (cycle.Al
 	ssql := "SELECT id, synonym, book_type, synonym_type, (SELECT IFNULL(MAX(1), 0) FROM book_pg_template bpt WHERE bpt.book = bs.id AND bpt.book_part IN (1, 3, 4, 5)) has_cover FROM book_synonym bs WHERE bs.src_type = 4 AND bs.synonym = ? ORDER BY bs.synonym_type DESC"
 	err := b.db.GetContext(ctx, &res, ssql, alias)
 	return res, err
+}
 
+func (b *basicRepository) AddExtraInfo(ctx context.Context, ei cycle.OrderExtraInfo) error {
+	var sb strings.Builder
+	//INSERT IGNORE  ??
+	sb.WriteString("INSERT INTO order_extra_info (id, endpaper, interlayer, cover, format, corner_type, kaptal, cover_material, books, sheets, date_in, book_thickness, group_id, remark, paper, calc_alias, calc_title, weight)")
+	sb.WriteString(" VALUES (?, LEFT(?, 100), LEFT(?, 100), LEFT(?, 250), LEFT(?, 250), LEFT(?, 100), LEFT(?, 100), LEFT(?, 250), ?, ?, ?, ?, ?, LEFT(?, 250), LEFT(?, 250), LEFT(?, 50), LEFT(?, 250), ?)")
+	var sql = sb.String()
+	_, err := b.db.ExecContext(ctx, sql, ei.ID, ei.EndPaper, ei.InterLayer, ei.Cover, ei.Format, ei.CornerType, ei.Kaptal, ei.CoverMaterial, ei.Books, ei.Sheets, ei.Date, ei.BookThickness, ei.GroupID, ei.Remark, ei.Paper, ei.Alias, ei.Title, ei.Weight)
+	return err
 }
