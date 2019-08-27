@@ -101,3 +101,10 @@ func (b *basicRepository) AddExtraInfo(ctx context.Context, ei cycle.OrderExtraI
 	_, err := b.db.ExecContext(ctx, sql, ei.ID, ei.EndPaper, ei.InterLayer, ei.Cover, ei.Format, ei.CornerType, ei.Kaptal, ei.CoverMaterial, ei.Books, ei.Sheets, ei.Date, ei.BookThickness, ei.GroupID, ei.Remark, ei.Paper, ei.Alias, ei.Title, ei.Weight)
 	return err
 }
+
+func (b *basicRepository) GetGroupState(ctx context.Context, baseID string, group int) (cycle.GroupState, error) {
+	var res cycle.GroupState
+	sql := "SELECT IFNULL(MAX(IF(o.id = ?, o.state, 0)), 0) basestate, IFNULL(MAX(IF(o.id = ?, 0, o.state)), 0) childstate FROM orders o WHERE o.group_id = ?"
+	err := b.db.GetContext(ctx, &res, sql, baseID, baseID, group)
+	return res, err
+}

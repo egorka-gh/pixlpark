@@ -36,7 +36,7 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 		if err == sql.ErrNoRows {
 			err = fmt.Errorf("Алиас '%s' не найден в БД", a)
 		}
-		return err
+		return ErrTransform{err}
 	}
 	//TODO implement other types (magnets etc)
 	switch alias.Type {
@@ -47,15 +47,15 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 		basePath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName)
 		list, err := folderList(basePath)
 		if err != nil {
-			return ErrSourceNotFound(err)
+			return ErrSourceNotFound{err}
 		}
 		if len(list) == 0 {
-			return ErrSourceNotFound(fmt.Errorf("Empty folder '%s'", basePath))
+			return ErrSourceNotFound{fmt.Errorf("Empty folder '%s'", basePath)}
 		}
 
 		err = listIndexItems(list, alias.HasCover)
 		if err != nil {
-			return ErrParce(err)
+			return ErrParce{err}
 		}
 
 		//set book index
@@ -90,12 +90,12 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 		//clear output folder
 		err = os.RemoveAll(outPath)
 		if err != nil {
-			return ErrFileSystem(err)
+			return ErrFileSystem{err}
 		}
 		outPath = path.Join(outPath, alias.Alias)
 		err = os.MkdirAll(outPath, 0755)
 		if err != nil {
-			return ErrFileSystem(err)
+			return ErrFileSystem{err}
 		}
 		//copy files
 		for _, fi := range list {
@@ -111,7 +111,7 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 			}
 			err = copyFile(path.Join(basePath, fi.OldName), path.Join(outPath, fi.NewName))
 			if err != nil {
-				return ErrFileSystem(err)
+				return ErrFileSystem{err}
 			}
 		}
 

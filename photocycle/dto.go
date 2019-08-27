@@ -16,6 +16,7 @@ type Repository interface {
 	ClearGroup(ctx context.Context, group int, keepID string) error
 	SetGroupState(ctx context.Context, state, group int, keepID string) error
 	AddExtraInfo(ctx context.Context, ei OrderExtraInfo) error
+	GetGroupState(ctx context.Context, baseID string, group int) (GroupState, error)
 	Close()
 }
 
@@ -43,10 +44,16 @@ type Order struct {
 	GroupID     int       `json:"group_id" db:"group_id"`
 	ClientID    int       `json:"client_id" db:"client_id"`
 	Production  int       `json:"production" db:"production"`
-	
+
 	//4 internal use
-	ExtraInfo   OrderExtraInfo
-	HasCover bool
+	ExtraInfo OrderExtraInfo
+	HasCover  bool
+}
+
+//GroupState is dto for orders states by GroupID
+type GroupState struct {
+	BaseState  int `json:"basestate" db:"basestate"`
+	ChildState int `json:"childstate" db:"childstate"`
 }
 
 //OrderExtraInfo represents the OrderExtraInfo of db object
