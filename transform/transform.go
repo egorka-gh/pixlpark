@@ -48,6 +48,11 @@ type Transform struct {
 	err error
 }
 
+// ID returns pp order id
+func (t *Transform) ID() string {
+	return t.ppOrder.ID
+}
+
 // IsComplete returns true if the transform has completed.
 // If an error occurred it can be returned via Err.
 func (t *Transform) IsComplete() bool {
