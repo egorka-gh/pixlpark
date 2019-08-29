@@ -4,17 +4,44 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	log "github.com/go-kit/kit/log"
 )
+
+//NewManager creates manager
+func NewManager(factory *Factory, concurrency, interval int, logger log.Logger) *Manager {
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if interval < 5 {
+		interval = 5
+	}
+
+	return &Manager{
+		factory:     factory,
+		concurrency: concurrency,
+		interval:    interval,
+		logger:      logger,
+	}
+}
 
 // Manager is queue manager of transform items (Transform)
 type Manager struct {
 	factory     *Factory
 	concurrency int
 	interval    int //sleep interval in min
+	logger      log.Logger
 
-	stop       chan struct{} //stop signal on close
-	stoped     chan struct{} //manager stoped on close or nil
-	cancel     context.CancelFunc
+	//run control
+	chWork       <-chan struct{}
+	chWorkBackup <-chan struct{}
+	chControl    chan struct{}
+	timer        *time.Timer
+
+	wg     sync.WaitGroup
+	cancel context.CancelFunc
+
+	//current transforms
 	mu         sync.Mutex            // guards transforms
 	transforms map[string]*Transform // ID -> transform
 }
@@ -22,109 +49,121 @@ type Manager struct {
 //provider creates and run trusforms (factory function)
 type provider func(ctx context.Context) *Transform
 
-//Stop stops manager
-//blocks while manager stops
-func (m *Manager) Stop() {
-	if m.IsRunning() == false {
-		return
-	}
-	//cancel current context
-	if m.cancel != nil {
-		m.cancel()
-	}
-	//signal stop
-	if m.stop != nil {
-		close(m.stop)
-		m.stop = nil
-	}
-	//waite till manager stops
-	<-m.stoped
+//IsStarted is manager started
+func (m *Manager) IsStarted() bool {
+	return m.chControl != nil
 }
 
-//IsRunning is manager started
+//IsRunning is manager running or paused
 func (m *Manager) IsRunning() bool {
-	if m.stoped == nil {
-		return false
-	}
-	select {
-	case <-m.stoped:
-		return false
-	default:
-		return true
-	}
-
+	return m.chWork != nil
 }
 
-//Start starts manager, blocks caler
-//if allready started returns immediately
-//when Stop called calcels/stops current operation and then exits
-func (m *Manager) Start() {
-	//lock waile check/init service chanels
-	m.mu.Lock()
-	//check if started
-	if m.IsRunning() {
-		m.mu.Unlock()
-		return
-	}
-	m.stoped = make(chan struct{}, 0)
-	m.stop = make(chan struct{}, 0)
-	m.mu.Unlock()
-
+//machine main routine
+//periodicaly fetch and transfom pending orders
+//can be paused and resumed
+func (m *Manager) machine() {
+	//clean up
 	defer func() {
-		if m.cancel != nil {
-			m.cancel()
-		}
+		m.wg.Done()
 	}()
 
-	//init
-	if m.concurrency < 1 {
-		m.concurrency = 1
-	}
-	if m.interval < 5 {
-		m.interval = 5
-	}
-
-	var err error
-	var ctx context.Context
-
-	//TODO need it? if sorefactor to func
-	//run revers sequense, restart stuck orders	first then new
-	ctx, m.cancel = context.WithCancel(context.Background())
-	//TODO add restarters
-	//run regular fetching
-	if err == nil && ctx.Err() == nil {
-		err = m.runQueue(ctx, m.factory.Do, true)
-	}
-
-	/*
-		//check if canceled
-		if ctx.Err() != nil {
-			return
-		}
-	*/
-
-	//release context
-	m.cancel()
-
-	//run regular fetching vs specified interval
-	alive := true
-	for alive {
-		//sleep
-		tm := time.NewTimer(time.Duration(m.interval*60) * time.Second)
+	var (
+		//err error
+		ctx context.Context
+	)
+Loop:
+	for {
 		select {
-		case <-m.stop:
-			//stop while sleep
-			alive = false
-		case <-tm.C:
-			//recreate context
+		case <-m.chWork:
+			//run regular fetching vs specified interval
+			//create context
 			ctx, m.cancel = context.WithCancel(context.Background())
 			m.doWork(ctx)
 			//release context
 			m.cancel()
+			//sleep
+			m.Pause()
+			m.timer = time.AfterFunc(time.Duration(m.interval)*time.Minute, m.play)
+		case _, ok := <-m.chWork:
+			//flow control
+			if ok {
+				//restart loop
+				continue Loop
+			}
+			// quit for
+			break Loop
 		}
 	}
-	//stoped
-	close(m.stoped)
+	//TODO finalizers??
+}
+
+//machine control
+
+//Start starts manager machine, don't blocks caller
+//if allready started just unblock machine
+func (m *Manager) Start() {
+	//resume if started
+	if m.IsStarted() {
+		m.play()
+	}
+
+	//init control
+	// chWork, chWorkBackup
+	ch := make(chan struct{})
+	close(ch)
+	m.chWork = ch
+	m.chWorkBackup = ch
+	// chControl
+	m.chControl = make(chan struct{})
+
+	// wg
+	m.wg = sync.WaitGroup{}
+	m.wg.Add(1)
+
+	go m.machine()
+}
+
+//Pause cancels current operation and blocks manager machine
+//non blocking
+func (m *Manager) Pause() {
+	if m.timer != nil {
+		m.timer.Stop()
+	}
+	if m.cancel != nil {
+		m.cancel()
+	}
+	m.chWork = nil
+	m.chControl <- struct{}{}
+}
+
+//play resume machine
+//non blocking
+func (m *Manager) play() {
+	if m.timer != nil {
+		m.timer.Stop()
+	}
+	m.chWork = m.chWorkBackup
+	m.chControl <- struct{}{}
+}
+
+//Quit cancels current operation and stops manager machine
+//non blocking
+//any calls to Start and Pause will panic (send to closed chControl)
+func (m *Manager) Quit() {
+	if m.timer != nil {
+		m.timer.Stop()
+	}
+	if m.cancel != nil {
+		m.cancel()
+	}
+	m.chWork = nil
+	close(m.chControl)
+}
+
+//Wait blocks caller till manager stops
+func (m *Manager) Wait() {
+	m.wg.Wait()
 }
 
 //run regular sequense, new first then restart stuck orders

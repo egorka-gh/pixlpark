@@ -1,0 +1,8 @@
+{
+    "source.id": 23,
+    "mysql": "root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true",
+    "folders.zip": "D:\\Buffer\\pp\\wrk",
+    "folders.in": "D:\\Buffer\\ftp\\in\\PXP",
+    "folders.prn": "",
+    "folders.log": ".\\log"
+}

@@ -38,91 +38,95 @@ func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order 
 		}
 		return ErrTransform{err}
 	}
-	//TODO implement other types (magnets etc)
-	switch alias.Type {
-	case 1, 2, 3:
-		//book
-		order.HasCover = alias.HasCover
-		//get file list
-		basePath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName)
-		list, err := folderList(basePath)
-		if err != nil {
-			return ErrSourceNotFound{err}
-		}
-		if len(list) == 0 {
-			return ErrSourceNotFound{fmt.Errorf("Empty folder '%s'", basePath)}
-		}
-
-		err = listIndexItems(list, alias.HasCover)
-		if err != nil {
-			return ErrParce{err}
-		}
-
-		//set book index
-		//TODO valid only for books, recheck for other products
-		if item.Quantity <= 1 {
-			//one book
-			for i := 0; i < len(list); i++ {
-				list[i].BookIdx = 1
-			}
-		} else {
-			//create copy of last item and set book
-			fi := list[len(list)-1]
-			fi.BookIdx = item.Quantity
-			list = append(list, fi)
-		}
-		//TODO check item.PageCount, don't forget added sheet if books > 1
-		//toProcess == item.PageCount
-
-		//set output names
-		//decode filenames to cycle names '000-00.jpg'
-		toProcess := 0
-		for i := 0; i < len(list); i++ {
-			if list[i].Process {
-				list[i].NewName = fmt.Sprintf("%03d-%02d%s", list[i].BookIdx, list[i].SheetIdx, filepath.Ext(list[i].OldName))
-				toProcess++
-			} else {
-				list[i].NewName = list[i].OldName
-			}
-		}
-		//copy to cycle wrk folder/orderid/alias
-		outPath := path.Join(fc.cycleFolder, order.FtpFolder)
-		//clear output folder
-		err = os.RemoveAll(outPath)
-		if err != nil {
-			return ErrFileSystem{err}
-		}
-		outPath = path.Join(outPath, alias.Alias)
-		err = os.MkdirAll(outPath, 0755)
-		if err != nil {
-			return ErrFileSystem{err}
-		}
-		//copy files
-		for _, fi := range list {
-			//check if transform context is canceled
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				// keep working
-			}
-			if fi.NoCopy {
-				continue
-			}
-			err = copyFile(path.Join(basePath, fi.OldName), path.Join(outPath, fi.NewName))
-			if err != nil {
-				return ErrFileSystem{err}
-			}
-		}
-
-		//update order
-		order.FotosNum = toProcess
-		//?? factory has to do it
-		//order.State = pc.StateConfirmation
-		//order.StateDate = time.Now()
-	default:
-		return fmt.Errorf("Неподдерживаемый тип %d алиаса '%s'", alias.Type, alias.Alias)
+	/*
+		//TODO implement other types (magnets etc)
+		switch alias.Type {
+		case 1, 2, 3:
+			//book
+	*/
+	order.HasCover = alias.HasCover
+	//get file list
+	basePath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName)
+	list, err := folderList(basePath)
+	if err != nil {
+		return ErrSourceNotFound{err}
 	}
+	if len(list) == 0 {
+		return ErrSourceNotFound{fmt.Errorf("Empty folder '%s'", basePath)}
+	}
+
+	err = listIndexItems(list, alias.HasCover)
+	if err != nil {
+		return ErrParce{err}
+	}
+
+	//set book index
+	//TODO valid only for books, recheck for other products
+	if item.Quantity <= 1 {
+		//one book
+		for i := 0; i < len(list); i++ {
+			list[i].BookIdx = 1
+		}
+	} else {
+		//create copy of last item and set book
+		fi := list[len(list)-1]
+		fi.BookIdx = item.Quantity
+		list = append(list, fi)
+	}
+	//TODO check item.PageCount, don't forget added sheet if books > 1
+	//toProcess == item.PageCount
+
+	//set output names
+	//decode filenames to cycle names '000-00.jpg'
+	toProcess := 0
+	for i := 0; i < len(list); i++ {
+		if list[i].Process {
+			list[i].NewName = fmt.Sprintf("%03d-%02d%s", list[i].BookIdx, list[i].SheetIdx, filepath.Ext(list[i].OldName))
+			toProcess++
+		} else {
+			list[i].NewName = list[i].OldName
+		}
+	}
+	//copy to cycle wrk folder/orderid/alias
+	outPath := path.Join(fc.cycleFolder, order.FtpFolder)
+	//clear output folder
+	err = os.RemoveAll(outPath)
+	if err != nil {
+		return ErrFileSystem{err}
+	}
+	outPath = path.Join(outPath, alias.Alias)
+	err = os.MkdirAll(outPath, 0755)
+	if err != nil {
+		return ErrFileSystem{err}
+	}
+	//copy files
+	for _, fi := range list {
+		//check if transform context is canceled
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			// keep working
+		}
+		if fi.NoCopy {
+			continue
+		}
+		err = copyFile(path.Join(basePath, fi.OldName), path.Join(outPath, fi.NewName))
+		if err != nil {
+			return ErrFileSystem{err}
+		}
+	}
+
+	//update order
+	order.FotosNum = toProcess
+	//?? factory has to do it
+	//order.State = pc.StateConfirmation
+	//order.StateDate = time.Now()
+	/*
+		default:
+			return fmt.Errorf("Неподдерживаемый тип %d алиаса '%s'", alias.Type, alias.Alias)
+		}
+	*/
 
 	return nil
 }

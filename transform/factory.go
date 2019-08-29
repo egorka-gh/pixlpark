@@ -235,40 +235,46 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 		co := fromPPOrder(po, fc.source, "@")
 		co.State = pc.StateLoadWaite
 		//check states in cycle
-		//load/check state from all orders by group
-		states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, co.GroupID)
-		if err != nil {
-			//TODO database not responding??
-			err = ErrRepository{err}
-			//stop all?
+		ok, err := fc.checkCreateInCycle(t, co)
+		if !ok {
 			continue
 		}
-		if states.BaseState == 0 && states.ChildState == 0 {
-			//normal flow - create base
-			if err = fc.pcClient.CreateOrder(t.ctx, co); err != nil {
+		/*
+			//load/check state from all orders by group
+			states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, co.GroupID)
+			if err != nil {
+				//TODO database not responding??
 				err = ErrRepository{err}
+				//stop all?
 				continue
 			}
-		} else {
-			if states.BaseState == pc.StateCanceledPHCycle {
-				//cancel in pp
-				_ = fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle")
-				continue
+			if states.BaseState == 0 && states.ChildState == 0 {
+				//normal flow - create base
+				if err = fc.pcClient.CreateOrder(t.ctx, co); err != nil {
+					err = ErrRepository{err}
+					continue
+				}
+			} else {
+				if states.BaseState == pc.StateCanceledPHCycle {
+					//cancel in pp
+					_ = fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle")
+					continue
+				}
+				if states.ChildState > pc.StatePrintWaite {
+					//cancel in pp
+					_ = fc.setPixelState(t, statePixelAbort, "Заказ отправлен на печать в PhotoCycle")
+					continue
+				}
+				//clear sub orders
+				if states.ChildState > 0 {
+					_ = fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)
+				}
+				//reset base state
+				if states.BaseState != co.State {
+					_ = fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
+				}
 			}
-			if states.ChildState > pc.StatePrintWaite {
-				//cancel in pp
-				_ = fc.setPixelState(t, statePixelAbort, "Заказ отправлен на печать в PhotoCycle")
-				continue
-			}
-			//clear sub orders
-			if states.ChildState > 0 {
-				_ = fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)
-			}
-			//reset base state
-			if states.BaseState != co.State {
-				_ = fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
-			}
-		}
+		*/
 		if err = fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false); err != nil {
 			//keep fetching
 			err = ErrService{err}
@@ -534,6 +540,13 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		return fc.closeTransform
 	}
 
+	if len(items) == 0 {
+		t.err = ErrTransform{errors.New("Order has no items")}
+		fc.setPixelState(t, statePixelAbort, "Пустой заказ")
+		fc.setCycleState(t, pc.StateSkiped, pc.StateErrWeb, "Пустой заказ")
+		return fc.closeTransform
+	}
+
 	//TODO check if cycle allready print suborder??
 	orders := make([]pc.Order, 0, len(items))
 	incomlete := false
@@ -583,6 +596,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		fc.log("error", msg)
 		_ = fc.setPixelState(t, statePixelWaiteConfirm, msg)
 		_ = fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrPreprocess, msg)
+		t.err = ErrTransform{errors.New(msg)}
 	} else {
 		//clear sub orders
 		err = fc.pcClient.ClearGroup(t.ctx, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
@@ -666,6 +680,46 @@ func (fc *Factory) closeTransform(t *Transform) stateFunc {
 	}
 
 	return nil
+}
+
+//check states in cycle
+func (fc *Factory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, err error) {
+	//load/check state from all orders by group
+	states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, co.GroupID)
+	if err != nil {
+		//TODO database not responding??
+		err = ErrRepository{err}
+		//stop all?
+		return false, err
+	}
+	if states.BaseState == 0 && states.ChildState == 0 {
+		//normal flow - create base
+		if err = fc.pcClient.CreateOrder(t.ctx, co); err != nil {
+			err = ErrRepository{err}
+			return false, err
+		}
+		return true, nil
+	}
+
+	if states.BaseState == pc.StateCanceledPHCycle {
+		//cancel in pp
+		_ = fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle")
+		return false, nil
+	}
+	if states.ChildState > pc.StatePrintWaite {
+		//cancel in pp
+		_ = fc.setPixelState(t, statePixelAbort, "Заказ отправлен на печать в PhotoCycle")
+		return false, nil
+	}
+	//clear sub orders
+	if states.ChildState > 0 {
+		_ = fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)
+	}
+	//reset base state
+	if states.BaseState != co.State {
+		_ = fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
+	}
+	return true, nil
 }
 
 func (fc *Factory) setPixelState(t *Transform, state, message string) error {

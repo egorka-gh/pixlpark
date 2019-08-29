@@ -2,6 +2,7 @@ package transform
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/cavaliercoder/grab"
@@ -51,6 +52,15 @@ type Transform struct {
 // ID returns pp order id
 func (t *Transform) ID() string {
 	return t.ppOrder.ID
+}
+
+//CycleID returns cycle orders id prefix
+func (t *Transform) CycleID() string {
+	l := len(t.pcBaseOrder.SourceID)
+	if l == 0 {
+		return ""
+	}
+	return strings.TrimRight(t.pcBaseOrder.ID, "@")
 }
 
 // IsComplete returns true if the transform has completed.
