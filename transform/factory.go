@@ -3,6 +3,7 @@ package transform
 import (
 	"archive/zip"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,7 @@ type Factory struct {
 	cycleFolder string
 	ppUser      string
 	logger      log.Logger
+	Debug       bool
 }
 
 //internal errors, factory has to make decision what to do (rise error or proceed transform)
@@ -89,7 +91,7 @@ func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sou
 	}
 }
 
-// Do main sequence
+// LoadNew main sequence
 // fetch new order and perfom full trunsform
 //
 // Like http.Get, Do blocks while the trunsform is initiated, but returns as soon
@@ -100,24 +102,23 @@ func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sou
 // An error is returned via Transform.Err. Transform.Err
 // will block the caller until the transform is completed, successfully or
 // otherwise.
-func (fc *Factory) Do(ctx context.Context) *Transform {
+func (fc *Factory) LoadNew(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	t := &Transform{
-		Start:  time.Now(),
-		Done:   make(chan struct{}, 0),
-		ctx:    ctx,
-		cancel: cancel,
+		fetchState: statePixelStartLoad,
+		Start:      time.Now(),
+		Done:       make(chan struct{}, 0),
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
 	fc.run(t, fc.fetchToLoad)
-	//TODO maybe transform manager has to now wich kinde of error?
 	if t.IsComplete() {
-		//TODO log error
-		fc.log("Do Error", t.Err().Error())
+		fc.log("LoadNew.Error", t.Err().Error())
 		return t
 	}
 	//Run load in a new goroutine
@@ -125,33 +126,27 @@ func (fc *Factory) Do(ctx context.Context) *Transform {
 	return t
 }
 
-// DoOrder loads order and perfom full trunsform (4 tests only)
-//
-// Like DO, DoOrder blocks while the trunsform is initiated, but returns as soon
-// as the trunsform has started  in a background goroutine, or if it
-// failed early.
-//
-// An error is returned via Transform.Err. Transform.Err
-// will block the caller until the transform is completed, successfully or
-// otherwise.
-func (fc *Factory) DoOrder(ctx context.Context, id string) *Transform {
+//LoadRestart reload orders that allready started (statePixelLoadStarted)
+// but not complete for some reason (service stop, some error while load, unzip)
+// behavior same as LoadNew exepct fetch orders in state statePixelLoadStarted
+// get ordrers vs statePixelLoadStarted in PP && StateLoadWaite in Cycle
+func (fc *Factory) LoadRestart(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	t := &Transform{
-		Start:   time.Now(),
-		Done:    make(chan struct{}, 0),
-		ctx:     ctx,
-		cancel:  cancel,
-		ppOrder: pp.Order{ID: id},
+		fetchState: statePixelLoadStarted,
+		Start:      time.Now(),
+		Done:       make(chan struct{}, 0),
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
-	fc.run(t, fc.getOrder)
-
+	fc.run(t, fc.fetchToLoad)
 	if t.IsComplete() {
-		fc.log("DoOrder Error", t.Err().Error())
+		fc.log("LoadRestart.Error", t.Err().Error())
 		return t
 	}
 	//Run load in a new goroutine
@@ -159,27 +154,62 @@ func (fc *Factory) DoOrder(ctx context.Context, id string) *Transform {
 	return t
 }
 
-//ResetStarted resets orders in state statePixelLoadStarted to state statePixelStartLoad (4 debug only)
-func (fc *Factory) ResetStarted(ctx context.Context) *Transform {
+//TransformRestart restart incompleted transforms
+// orders that loaded and unziped but not complete for some reason (service stop or some error while transform)
+// behavior same as LoadNew exepct fetch orders method
+// get ordrers vs statePixelLoadStarted in PP && StateUnzip in Cycle
+func (fc *Factory) TransformRestart(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	t := &Transform{
-		Start:  time.Now(),
-		Done:   make(chan struct{}, 0),
-		ctx:    ctx,
-		cancel: cancel,
+		fetchState: statePixelLoadStarted,
+		Start:      time.Now(),
+		Done:       make(chan struct{}, 0),
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
-	fc.run(t, fc.resetFetched)
-
-	if !t.IsComplete() {
-		panic("transform: developer error: resetFetched must return completed transform")
+	fc.run(t, fc.fetchToTransform)
+	if t.IsComplete() {
+		fc.log("TransformRestart.Error", t.Err().Error())
+		return t
 	}
-	fc.log("ResetStarted", t.Err().Error())
-	return nil
+	//Run transform in a new goroutine
+	go fc.run(t, fc.transformItems)
+	return t
+}
+
+//FinalizeRestart updates states for complited transforms
+// orders in cycle that hangs in StateLoadComplite on error when moved to StatePreprocessWaite (writeLock or some else)
+// see transformItems SetGroupState at the end
+// behavior is different
+// allways returns complited transform
+// do all in one step
+func (fc *Factory) FinalizeRestart(ctx context.Context) *Transform {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	t := &Transform{
+		fetchState: statePixelLoadStarted,
+		Start:      time.Now(),
+		Done:       make(chan struct{}, 0),
+		ctx:        ctx,
+		cancel:     cancel,
+	}
+
+	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
+	fc.run(t, fc.fetchToTransform)
+	if t.IsComplete() {
+		fc.log("TransformRestart.Error", t.Err().Error())
+		return t
+	}
+	//Run transform in a new goroutine
+	go fc.run(t, fc.transformItems)
+	return t
 }
 
 // An stateFunc is factory unit of work
@@ -219,12 +249,13 @@ func (fc *Factory) log(key, massage string) {
 //bloks till get some order to process
 //on success t is not closed (valid for processing)
 //if there is no orders returns ErrEmptyQueue
-//fetch in PP state statePixelStartLoad
+//fetch in PP state statePixelStartLoad or statePixelLoadStarted
 //fetched order moves to statePixelLoadStarted in PP and to StateLoadWaite in cycle
 //must check order state in cycle (not implemented)
 func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 	//pp.StatePrepressCoordination
-	orders, err := fc.ppClient.GetOrders(t.ctx, statePixelStartLoad, 0, 0, 10, 0)
+	fc.log("fetchState", t.fetchState)
+	orders, err := fc.ppClient.GetOrders(t.ctx, t.fetchState, 0, 0, 10, 0)
 	if err != nil {
 		t.err = ErrService{err}
 		return fc.closeTransform
@@ -239,46 +270,13 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 		if !ok {
 			continue
 		}
-		/*
-			//load/check state from all orders by group
-			states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, co.GroupID)
-			if err != nil {
-				//TODO database not responding??
-				err = ErrRepository{err}
-				//stop all?
+		//move state in PP to statePixelLoadStarted
+		if t.fetchState != statePixelLoadStarted {
+			if err = fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false); err != nil {
+				//keep fetching
+				err = ErrService{err}
 				continue
 			}
-			if states.BaseState == 0 && states.ChildState == 0 {
-				//normal flow - create base
-				if err = fc.pcClient.CreateOrder(t.ctx, co); err != nil {
-					err = ErrRepository{err}
-					continue
-				}
-			} else {
-				if states.BaseState == pc.StateCanceledPHCycle {
-					//cancel in pp
-					_ = fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle")
-					continue
-				}
-				if states.ChildState > pc.StatePrintWaite {
-					//cancel in pp
-					_ = fc.setPixelState(t, statePixelAbort, "Заказ отправлен на печать в PhotoCycle")
-					continue
-				}
-				//clear sub orders
-				if states.ChildState > 0 {
-					_ = fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)
-				}
-				//reset base state
-				if states.BaseState != co.State {
-					_ = fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
-				}
-			}
-		*/
-		if err = fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false); err != nil {
-			//keep fetching
-			err = ErrService{err}
-			continue
 		}
 		//сan load stop fetching
 		t.ppOrder = po
@@ -290,73 +288,107 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 		t.err = err
 	} else {
 		//empty queue
-		t.err = ErrEmptyQueue{fmt.Errorf("No orders in state %s", statePixelStartLoad)}
+		t.err = ErrEmptyQueue{fmt.Errorf("No orders in state %s", t.fetchState)}
 	}
 	return fc.closeTransform
 }
 
-//getOrder tries to load order from PP (4 tests only)
-//expects ID in dummy t.ppOrder
+//fetchToTransform looks for in cycle orders whith not complited transform
+//bloks till get some order to process
 //on success t is not closed (valid for processing)
-//TODO 4 production add states check
-func (fc *Factory) getOrder(t *Transform) stateFunc {
-	fc.log("getOrder", t.ppOrder.ID)
-	po, err := fc.ppClient.GetOrder(t.ctx, t.ppOrder.ID)
+//if there is no orders returns ErrEmptyQueue
+//fetch in PP state statePixelLoadStarted & cycle state StateUnzip
+func (fc *Factory) fetchToTransform(t *Transform) stateFunc {
+	//get one from cycle
+	var err error
+	t.pcBaseOrder, err = fc.pcClient.LoadBaseOrderByState(t.ctx, fc.source, pc.StateUnzip)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			t.err = ErrRepository{err}
+		} else {
+			t.err = ErrEmptyQueue{fmt.Errorf("No orders in cycle with state StateUnzip")}
+		}
+		return fc.closeTransform
+	}
+	//load from PP
+	t.ppOrder, err = fc.ppClient.GetOrder(t.ctx, t.pcBaseOrder.SourceID)
 	if err != nil {
 		t.err = ErrService{err}
 		return fc.closeTransform
 	}
-	co := fromPPOrder(po, fc.source, "@")
-	co.State = pc.StateLoadWaite
-	_ = fc.pcClient.CreateOrder(t.ctx, co)
-	_ = fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
-
-	if err = fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false); err != nil {
-		t.err = ErrService{err}
-		return fc.closeTransform
+	//check PP state
+	if t.ppOrder.Status != statePixelLoadStarted {
+		//wrong state in PP
+		//TODO reset in cycle ??
+		msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", t.ppOrder.Status, statePixelLoadStarted)
+		err = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
+		if err != nil {
+			t.err = ErrRepository{err}
+			return fc.closeTransform
+		}
+		// try one more time
+		return fc.fetchToTransform
 	}
-	//loaded
-	t.ppOrder = po
-	t.pcBaseOrder = co
+
+	//fetched
 	return nil
 }
 
-//resetFetched - reset orders in statePixelLoadStarted (4 dubug only)
-func (fc *Factory) resetFetched(t *Transform) stateFunc {
-	doFetch := true
-	skip := 0
-	//while has some orders in statePixelLoadStarted
-	//can be Infinite loop if some SetOrderStatus incompleted ??
-	for doFetch {
-		orders, err := fc.ppClient.GetOrders(t.ctx, statePixelLoadStarted, 0, 0, 10, skip)
-
+//doFinalize loads all orders in state StateLoadComplite check in PP for StatePrinting
+// and moves to state StatePreprocessWaite
+//bloks till process all
+//allways returns complited transform
+func (fc *Factory) doFinalize(t *Transform) stateFunc {
+	//get order list from DB
+	orders, err := fc.pcClient.LoadBaseOrderByChildState(t.ctx, fc.source, pc.StateUnzip, pc.StateLoadComplite)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			t.err = ErrRepository{err}
+		} else {
+			t.err = ErrEmptyQueue{fmt.Errorf("No orders in cycle with appropriate states")}
+		}
+		return fc.closeTransform
+	}
+	for _, t.pcBaseOrder = range orders {
+		//load from PP
+		t.ppOrder, err = fc.ppClient.GetOrder(t.ctx, t.pcBaseOrder.SourceID)
 		if err != nil {
-			t.err = err
+			t.err = ErrService{err}
 			return fc.closeTransform
 		}
-		doFetch = len(orders) > 0
-		for _, po := range orders {
-			fc.log("resetFetched", po.ID)
-			co := fromPPOrder(po, fc.source, "@")
+		//check PP state
+		if t.ppOrder.Status != pp.StatePrinting {
+			//wrong state in PP
+			//TODO reset in cycle ??
+			msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", t.ppOrder.Status, pp.StatePrinting)
+			err = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
+			if err != nil {
+				t.err = ErrRepository{err}
+				return fc.closeTransform
+			}
+		}
+		//finalize
+		//move all to waite preprocess to start in cycle
+		err = fc.pcClient.SetGroupState(t.ctx, pc.StatePreprocessWaite, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
+		if err != nil {
+			t.err = ErrRepository{err}
+			fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
+			return fc.closeTransform
+		}
 
-			//TODO load/check state from all orders by group?
-			if co.State == pc.StateCanceledPHCycle {
-				//cancel in pp
-				if err := fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle"); err != nil {
-					skip++
-				}
-				continue
-			}
-			//reset
-			if err := fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelStartLoad, false); err != nil {
-				skip++
-				continue
-			}
-			_ = fc.setCycleState(t, pc.StateLoadWaite, 0, "")
+		//move main to complite state
+		fc.setCycleState(t, pc.StateSkiped, pc.StateTransform, "complete")
+
+		//TODO finalize
+		//kill zip and unziped folder
+		if !fc.Debug {
+			_ = os.Remove(filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip"))
+			_ = os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID))
 		}
 	}
 
-	t.err = ErrEmptyQueue{fmt.Errorf("No orders in state %s", statePixelLoadStarted)}
+	//complited
+	t.err = ErrEmptyQueue{fmt.Errorf("Complite")}
 	return fc.closeTransform
 }
 
@@ -377,7 +409,6 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 	if t.err != nil {
 		//filesystem err
 		//log to cycle && close (state LoadWaie in cycle)
-		//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки:"+t.err.Error())
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrFileSystem, t.err.Error())
 		return fc.closeTransform
 	}
@@ -386,7 +417,6 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 	if err != nil {
 		t.err = ErrService{err}
 		//log to cycle && close (state LoadWaie in cycle)
-		//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrWeb, t.err.Error())
 		return fc.closeTransform
 	}
@@ -401,7 +431,6 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 		t.err = ErrService{err}
 		//TODO err limiter
 		//log to cycle && close (state LoadWaie in cycle)
-		//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrWeb, t.err.Error())
 		return fc.closeTransform
 	}
@@ -425,7 +454,6 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 		//broken zip?
 		t.err = ErrService{err}
 		//log to cycle && close (state LoadWaie in cycle)
-		//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrZip, t.err.Error())
 		return fc.closeTransform
 	}
@@ -433,7 +461,6 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 	if err = os.MkdirAll(basePath, 0755); err != nil {
 		t.err = ErrFileSystem{err}
 		//log to cycle && close (state LoadWaie in cycle)
-		//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrFileSystem, t.err.Error())
 		return fc.closeTransform
 	}
@@ -463,7 +490,6 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 		if err := os.MkdirAll(filepath.Dir(filePpath), 0755); err != nil {
 			t.err = ErrFileSystem{err}
 			//log to cycle && close (state LoadWaie in cycle)
-			//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 			_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrFileSystem, t.err.Error())
 			return fc.closeTransform
 		}
@@ -474,7 +500,6 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 			//broken zip?
 			t.err = ErrService{err}
 			//log to cycle && close (state LoadWaie in cycle)
-			//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 			_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrZip, t.err.Error())
 			return fc.closeTransform
 		}
@@ -485,7 +510,6 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 		if err != nil {
 			t.err = ErrFileSystem{err}
 			//log to cycle && close (state LoadWaie in cycle)
-			//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 			_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrFileSystem, t.err.Error())
 			return fc.closeTransform
 		}
@@ -496,7 +520,6 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 			//broken zip or file system err?
 			t.err = ErrFileSystem{err}
 			//log to cycle && close (state LoadWaie in cycle)
-			//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 			_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrZip, t.err.Error())
 			return fc.closeTransform
 		}
@@ -514,12 +537,14 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 //out states:
 // if unziped folders or files not found (error ErrSourceNotFound) restart load
 //		pp - statePixelStartLoad; cycle - StateLoadWaite
+// if empty order (no items) hard error lock for processing
+//		pp - statePixelAbort; cycle - StateSkiped
 // if not all items processed move to soft stop, to proceed set statePixelConfirmed in pp (not implemented)
 //		pp - statePixelWaiteConfirm; cycle - StatePreprocessIncomplite
 // if error while creating orders in cycle (ErrRepository) or
 // if error while set in PP StatePrinting
 //	left as is, transform will restart late (not implemented)
-//		pp - statePixelStartLoad; cycle - StateUnzip
+//		pp - statePixelLoadStarted; cycle - StateUnzip
 // if error while move created orders to StatePreprocessWaite in cycle
 // get by state StateLoadComplite check state StatePrinting in pp and try set cycle state again (not implemented)
 //		pp - StatePrinting; cycle - base: StateUnzip; orders: StateLoadComplite
@@ -535,7 +560,6 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		//TODO restart?
 		t.err = ErrService{err}
 		//log to cycle && close (state StateUnzip in cycle)
-		//fc.setPixelState(t, statePixelStartLoad, "Перезапуск загрузки из за ошибки: "+t.err.Error())
 		_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWeb, t.err.Error())
 		return fc.closeTransform
 	}
@@ -544,6 +568,9 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		t.err = ErrTransform{errors.New("Order has no items")}
 		fc.setPixelState(t, statePixelAbort, "Пустой заказ")
 		fc.setCycleState(t, pc.StateSkiped, pc.StateErrWeb, "Пустой заказ")
+		if fc.Debug {
+			fmt.Printf("Пустой заказ\n")
+		}
 		return fc.closeTransform
 	}
 
@@ -561,6 +588,9 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		if alias != "" {
 			err = fc.transformAlias(t.ctx, item, &co)
 			if err != nil {
+				if fc.Debug {
+					fmt.Printf("Элемент заказа %s '%s'. Ошибка %s\n", co.SourceID, item.Name, err.Error())
+				}
 				msg := fmt.Sprintf("Перезапуск загрузки. Элемент заказа %s '%s'. Ошибка %s", co.SourceID, item.Name, err.Error())
 				if _, ok := err.(ErrSourceNotFound); ok == true {
 					//unziped folder deleted??
@@ -585,6 +615,9 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 			//log error
 			incomlete = true
 			msg := fmt.Sprintf("Элемент заказа %s '%s' не обработан. Для продукта не настроены параметры подготовки", co.SourceID, item.Name)
+			if fc.Debug {
+				fmt.Println(msg)
+			}
 			fc.log("error", msg)
 			_ = fc.setPixelState(t, "", msg)
 			_ = fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
@@ -602,7 +635,6 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		err = fc.pcClient.ClearGroup(t.ctx, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
 		if err != nil {
 			t.err = ErrRepository{err}
-			//fc.setPixelState(t, "", fmt.Sprintf("Ошибка БД: %s", err.Error()))
 			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
 			return fc.closeTransform
 		}
@@ -611,7 +643,6 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 			err = fc.pcClient.CreateOrder(t.ctx, co)
 			if err != nil {
 				t.err = ErrRepository{err}
-				//fc.setPixelState(t, "", fmt.Sprintf("Ошибка БД: %s", err.Error()))
 				_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
 				return fc.closeTransform
 			}
@@ -625,7 +656,6 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		if err != nil {
 			//TODO report err??
 			t.err = ErrService{err}
-			//fc.setPixelState(t, statePixelWaiteConfirm, fmt.Sprintf("Ошибка БД: %s", err.Error()))
 			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWeb, fmt.Sprintf("Ошибка смены статуса на сайте. Статус:%s; Ошибка:%s ", pp.StatePrinting, err.Error()))
 			return fc.closeTransform
 		}
@@ -634,7 +664,6 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		if err != nil {
 			//TODO report err??
 			t.err = ErrRepository{err}
-			//fc.setPixelState(t, "", fmt.Sprintf("Ошибка БД: %s", err.Error()))
 			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
 			return fc.closeTransform
 		}
@@ -644,8 +673,10 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 
 		//TODO finalize
 		//kill zip and unziped folder
-		_ = os.Remove(filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip"))
-		_ = os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID))
+		if !fc.Debug {
+			_ = os.Remove(filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip"))
+			_ = os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID))
+		}
 	}
 
 	//TODO forvard to ?
@@ -711,6 +742,17 @@ func (fc *Factory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, err e
 		_ = fc.setPixelState(t, statePixelAbort, "Заказ отправлен на печать в PhotoCycle")
 		return false, nil
 	}
+
+	//check by fetch state
+	if t.fetchState == statePixelLoadStarted {
+		//reload sequence
+		if states.BaseState == pc.StateUnzip {
+			//order for retransfom sequence (loaded but not transformed)
+			//skip
+			return false, nil
+		}
+	}
+
 	//clear sub orders
 	if states.ChildState > 0 {
 		_ = fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)

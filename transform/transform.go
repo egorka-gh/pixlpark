@@ -13,6 +13,9 @@ import (
 
 // Transform represents the transform of pixlpark oreder to photocycle orders.
 type Transform struct {
+	//PP state in which the order must be fetched
+	fetchState string
+
 	//ppOrder pixelpark original order
 	ppOrder pp.Order
 

@@ -17,6 +17,8 @@ type Repository interface {
 	SetGroupState(ctx context.Context, state, group int, keepID string) error
 	AddExtraInfo(ctx context.Context, ei OrderExtraInfo) error
 	GetGroupState(ctx context.Context, baseID string, group int) (GroupState, error)
+	LoadBaseOrderByState(ctx context.Context, source, state int) (Order, error)
+	LoadBaseOrderByChildState(ctx context.Context, source, baseState, childState int) ([]Order, error)
 	Close()
 }
 

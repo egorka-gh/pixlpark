@@ -168,7 +168,7 @@ func (m *Manager) Wait() {
 
 //run regular sequense, new first then restart stuck orders
 func (m *Manager) doWork(ctx context.Context) {
-	err := m.runQueue(ctx, m.factory.Do, true)
+	err := m.runQueue(ctx, m.factory.LoadNew, true)
 	if err != nil || ctx.Err() != nil {
 		return
 	}
