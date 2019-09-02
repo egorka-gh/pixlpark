@@ -146,6 +146,7 @@ type OrderItem struct {
 	AdditionalFields map[string]string `json:"AdditionalFields"`
 	DirectoryName    string            `json:"DirectoryName"`
 	Comment          string            `json:"Comment"`
+	Sizes            OrderItemSizes    `json:"EditorOutput"`
 	skuMap           map[string]string
 }
 
@@ -174,6 +175,12 @@ type OrderItemOption struct {
 	Price           float64        `json:"Price"`
 	PriceFormatType string         `json:"PriceFormatType"`
 	SkuItems        []OrderItemSku `json:"SkuItems"`
+}
+
+// OrderItemSizes represent pp Order Item EditorOutput
+type OrderItemSizes struct {
+	Height float64 `json:"Height"`
+	Width  float64 `json:"Width"`
 }
 
 // OrderItemSku represent pp Order Item SKU

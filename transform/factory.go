@@ -75,7 +75,7 @@ type ErrService struct {
 }
 
 var (
-	errCantTransform = ErrCantTransform{errors.New("Can't transform")}
+	errCantTransform = ErrCantTransform{errors.New("Для продукта не настроены параметры подготовки")}
 )
 
 // NewFactory returns a new transform Factory, using provided configuration.
@@ -569,6 +569,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 	}
 
 	//TODO check if cycle allready print suborder??
+	//process items
 	orders := make([]pc.Order, 0, len(items))
 	incomlete := false
 	for i, item := range items {
@@ -577,52 +578,46 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 		//create cycle order
 		co := fromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", i))
 		co.SourceID = fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID)
+
 		//try build by alias
-		alias := item.Sku()["alias"]
-		if alias != "" {
-			err = fc.transformAlias(t.ctx, item, &co)
-			if err != nil {
+		err = fc.transformAlias(t.ctx, item, &co)
+		if _, ok := err.(ErrCantTransform); ok == true {
+			//try another method
+			//TODO implement photo print
+		}
+		if err != nil {
+			incomlete = true
+			msg := ""
+			if _, ok := err.(ErrSourceNotFound); ok == true {
+				//unziped folder deleted??
+				//reset to reload & close transform
+				msg = fmt.Sprintf("Перезапуск загрузки. Элемент заказа %s '%s'. Ошибка %s", co.SourceID, item.Name, err.Error())
 				if fc.Debug {
 					fmt.Printf("Элемент заказа %s '%s'. Ошибка %s\n", co.SourceID, item.Name, err.Error())
 				}
-				msg := fmt.Sprintf("Перезапуск загрузки. Элемент заказа %s '%s'. Ошибка %s", co.SourceID, item.Name, err.Error())
-				if _, ok := err.(ErrSourceNotFound); ok == true {
-					//unziped folder deleted??
-					//reset to reload & close transform
-					_ = fc.setPixelState(t, statePixelStartLoad, msg)
-					_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
-					return fc.closeTransform
-				}
-				//some other err
-				incomlete = true
-				//just log error
-				fc.log("error", msg)
-				_ = fc.setPixelState(t, "", msg)
-				_ = fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
-			} else {
-				co.ExtraInfo = buildExtraInfo(co, item)
-				co.State = pc.StateLoadComplite
-				orders = append(orders, co)
+				fc.setPixelState(t, statePixelStartLoad, msg)
+				fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
+				return fc.closeTransform
 			}
-		} else {
-			//TODO some other
-			//log error
-			incomlete = true
-			msg := fmt.Sprintf("Элемент заказа %s '%s' не обработан. Для продукта не настроены параметры подготовки", co.SourceID, item.Name)
-			if fc.Debug {
-				fmt.Println(msg)
-			}
+			msg = fmt.Sprintf("Элемент заказа %s '%s' не обработан. Ошибка %s", co.SourceID, item.Name, err.Error())
+			//just log error
 			fc.log("error", msg)
-			_ = fc.setPixelState(t, "", msg)
-			_ = fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
+			fc.setPixelState(t, "", msg)
+			fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
+		} else {
+			//item processed, add order
+			co.ExtraInfo = buildExtraInfo(co, item)
+			co.State = pc.StateLoadComplite
+			orders = append(orders, co)
 		}
 	}
+
 	if incomlete {
-		//log error ??
+		//TODO restarter not implemented
 		msg := "Часть элементов заказа не обработано. Заказ не размещен в Photocycle"
 		fc.log("error", msg)
-		_ = fc.setPixelState(t, statePixelWaiteConfirm, msg)
-		_ = fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrPreprocess, msg)
+		fc.setPixelState(t, statePixelWaiteConfirm, msg)
+		fc.setCycleState(t, pc.StatePreprocessIncomplite, pc.StateErrPreprocess, msg)
 		t.err = ErrTransform{errors.New(msg)}
 	} else {
 		//clear sub orders

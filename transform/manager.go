@@ -168,11 +168,30 @@ func (m *Manager) Wait() {
 
 //run regular sequense, new first then restart stuck orders
 func (m *Manager) doWork(ctx context.Context) {
+	//load new
 	err := m.runQueue(ctx, m.factory.LoadNew, true)
 	if err != nil || ctx.Err() != nil {
 		return
 	}
-	//TODO add restarters
+
+	//run restarters
+
+	//finalize prepared
+	err = m.runQueue(ctx, m.factory.FinalizeRestart, true)
+	if err != nil || ctx.Err() != nil {
+		return
+	}
+	//restart broken transforms
+	err = m.runQueue(ctx, m.factory.TransformRestart, true)
+	if err != nil || ctx.Err() != nil {
+		return
+	}
+	//restart broken loads
+	err = m.runQueue(ctx, m.factory.LoadRestart, true)
+	if err != nil || ctx.Err() != nil {
+		return
+	}
+
 }
 
 //TODO add transforms limit??
