@@ -16,6 +16,14 @@ import (
 	"github.com/go-kit/kit/transport/http"
 )
 
+// HTTPDebug is the context key to use with golang.org/x/net/context's
+var HTTPDebug ContextKey
+
+// ContextKey is just an empty struct. It exists so HTTPClient can be
+// an immutable public variable with a unique type. It's immutable
+// because nobody else can create a ContextKey, being unexported.
+type ContextKey struct{}
+
 // New returns an PPService backed by an HTTP server living at the remote
 // instance. We expect instance to come from a service discovery system, so
 // likely of the form "host:port".
@@ -119,19 +127,21 @@ func encodeGetOrdersRequest(_ context.Context, r *http1.Request, request interfa
 	return nil
 }
 
-func decodeGetOrdersResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+func decodeGetOrdersResponse(ctx context.Context, r *http1.Response) (interface{}, error) {
 	if r.StatusCode != http1.StatusOK {
 		return nil, statusError(r.StatusCode)
 	}
 	var resp GetOrdersResponse
-	/* to debug response
-	var raw bytes.Buffer
-	tee := io.TeeReader(r.Body, &raw)
-	err := json.NewDecoder(tee).Decode(&resp)
-	resp.RawResponse = raw.String()
-	fmt.Println(resp.RawResponse)
-	*/
-	err := json.NewDecoder(r.Body).Decode(&resp)
+	var err error
+	if isDebugSet(ctx) {
+		var raw bytes.Buffer
+		tee := io.TeeReader(r.Body, &raw)
+		err = json.NewDecoder(tee).Decode(&resp)
+		resp.RawResponse = raw.String()
+		fmt.Println(resp.RawResponse)
+	} else {
+		err = json.NewDecoder(r.Body).Decode(&resp)
+	}
 	return resp, err
 }
 
@@ -151,19 +161,21 @@ func encodeGetOrderItemsRequest(_ context.Context, r *http1.Request, request int
 	return nil
 }
 
-func decodeGetOrderItemsResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+func decodeGetOrderItemsResponse(ctx context.Context, r *http1.Response) (interface{}, error) {
 	if r.StatusCode != http1.StatusOK {
 		return nil, statusError(r.StatusCode)
 	}
 	var resp GetOrderItemsResponse
-	/* to debug response */
-	var raw bytes.Buffer
-	tee := io.TeeReader(r.Body, &raw)
-	err := json.NewDecoder(tee).Decode(&resp)
-	resp.RawResponse = raw.String()
-	fmt.Println(resp.RawResponse)
-	/**/
-	//err := json.NewDecoder(r.Body).Decode(&resp)
+	var err error
+	if isDebugSet(ctx) {
+		var raw bytes.Buffer
+		tee := io.TeeReader(r.Body, &raw)
+		err = json.NewDecoder(tee).Decode(&resp)
+		resp.RawResponse = raw.String()
+		fmt.Println(resp.RawResponse)
+	} else {
+		err = json.NewDecoder(r.Body).Decode(&resp)
+	}
 	return resp, err
 }
 
@@ -194,19 +206,21 @@ func encodeSetOrderStatusRequest(_ context.Context, r *http1.Request, request in
 	return nil
 }
 
-func decodeSetOrderStatusResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+func decodeSetOrderStatusResponse(ctx context.Context, r *http1.Response) (interface{}, error) {
 	if r.StatusCode != http1.StatusOK {
 		return nil, statusError(r.StatusCode)
 	}
 	var resp SetOrderStatusResponse
-	/* to debug response
-	var raw bytes.Buffer
-	tee := io.TeeReader(r.Body, &raw)
-	err := json.NewDecoder(tee).Decode(&resp)
-	resp.RawResponse = raw.String()
-	fmt.Println(resp.RawResponse)
-	*/
-	err := json.NewDecoder(r.Body).Decode(&resp)
+	var err error
+	if isDebugSet(ctx) {
+		var raw bytes.Buffer
+		tee := io.TeeReader(r.Body, &raw)
+		err = json.NewDecoder(tee).Decode(&resp)
+		resp.RawResponse = raw.String()
+		fmt.Println(resp.RawResponse)
+	} else {
+		err = json.NewDecoder(r.Body).Decode(&resp)
+	}
 	return resp, err
 }
 
@@ -222,19 +236,21 @@ func encodeAddOrderCommentRequest(_ context.Context, r *http1.Request, request i
 	return nil
 }
 
-func decodeAddOrderCommentResponse(_ context.Context, r *http1.Response) (interface{}, error) {
+func decodeAddOrderCommentResponse(ctx context.Context, r *http1.Response) (interface{}, error) {
 	if r.StatusCode != http1.StatusOK {
 		return nil, statusError(r.StatusCode)
 	}
 	var resp AddOrderCommentResponse
-	/* to debug response
-	var raw bytes.Buffer
-	tee := io.TeeReader(r.Body, &raw)
-	err := json.NewDecoder(tee).Decode(&resp)
-	resp.RawResponse = raw.String()
-	fmt.Println(resp.RawResponse)
-	*/
-	err := json.NewDecoder(r.Body).Decode(&resp)
+	var err error
+	if isDebugSet(ctx) {
+		var raw bytes.Buffer
+		tee := io.TeeReader(r.Body, &raw)
+		err = json.NewDecoder(tee).Decode(&resp)
+		resp.RawResponse = raw.String()
+		fmt.Println(resp.RawResponse)
+	} else {
+		err = json.NewDecoder(r.Body).Decode(&resp)
+	}
 	return resp, err
 }
 
@@ -247,4 +263,13 @@ func copyURL(base *url.URL, path string) (next *url.URL) {
 	n.Path = path
 	next = &n
 	return
+}
+
+func isDebugSet(ctx context.Context) bool {
+	if ctx != nil {
+		if debug, ok := ctx.Value(HTTPDebug).(bool); ok {
+			return debug
+		}
+	}
+	return false
 }

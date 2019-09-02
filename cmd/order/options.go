@@ -6,6 +6,7 @@ import (
 	http0 "net/http"
 	"time"
 
+	"github.com/egorka-gh/pixlpark/pixlpark/service"
 	"github.com/go-kit/kit/endpoint"
 	log "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/transport/http"
@@ -21,6 +22,7 @@ func defaultHTTPOptions(cli *http0.Client, logger log.Logger) map[string][]http.
 		if logger != nil {
 			options[v] = append(options[v], beforeURILogger(log.With(logger, "method", v)))
 		}
+		options[v] = append(options[v], beforeSetDebug(true))
 	}
 
 	//"CountOrders": {http.SetClient(cli), beforeURIExtractor()},
@@ -50,6 +52,14 @@ func beforeURILogger(l log.Logger) http.ClientOption {
 		func(ctx context.Context, r *http0.Request) context.Context {
 			l.Log("uri", r.URL.RequestURI())
 			return ctx
+		},
+	)
+}
+
+func beforeSetDebug(debug bool) http.ClientOption {
+	return http.ClientBefore(
+		func(ctx context.Context, r *http0.Request) context.Context {
+			return context.WithValue(ctx, service.HTTPDebug, debug)
 		},
 	)
 }

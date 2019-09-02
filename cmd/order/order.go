@@ -80,7 +80,7 @@ Loop:
 	for {
 		select {
 		case <-t.C:
-			fmt.Printf("Скорость загрузки %.2f\n", transf.BytesPerSecond()/(1024*1024))
+			fmt.Printf("Скорость загрузки %.2fmb/s\n", transf.BytesPerSecond()/(1024*1024))
 		case <-transf.Done:
 			// download is complete
 			break Loop

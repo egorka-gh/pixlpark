@@ -2,6 +2,7 @@ package transform
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -72,6 +73,11 @@ func (fc *Factory) ResetStarted(ctx context.Context) *Transform {
 //TODO 4 production add states check
 func (fc *Factory) getOrder(t *Transform) stateFunc {
 	fc.log("getOrder", t.ppOrder.ID)
+	if !fc.Debug {
+		t.err = errors.New("DoOrder can be used only in debug mode")
+		return fc.closeTransform
+	}
+
 	po, err := fc.ppClient.GetOrder(t.ctx, t.ppOrder.ID)
 	if err != nil {
 		t.err = ErrService{err}
@@ -79,15 +85,20 @@ func (fc *Factory) getOrder(t *Transform) stateFunc {
 	}
 	co := fromPPOrder(po, fc.source, "@")
 	co.State = pc.StateLoadWaite
-	_ = fc.pcClient.CreateOrder(t.ctx, co)
-	_ = fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
+	//try to create
+	fc.pcClient.CreateOrder(t.ctx, co)
+	//clear if allready processed
+	fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)
+	//set/reset base state
+	fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
 
-	if !fc.Debug {
-		if err = fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false); err != nil {
-			t.err = ErrService{err}
-			return fc.closeTransform
-		}
+	/*do not change state in PP
+	if err = fc.ppClient.SetOrderStatus(t.ctx, po.ID, statePixelLoadStarted, false); err != nil {
+		t.err = ErrService{err}
+		return fc.closeTransform
 	}
+	*/
+
 	//loaded
 	t.ppOrder = po
 	t.pcBaseOrder = co
