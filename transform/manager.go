@@ -16,6 +16,7 @@ func NewManager(factory Factory, concurrency, interval int, logger log.Logger) *
 	if interval < 5 {
 		interval = 5
 	}
+	interval = interval * 60
 
 	return &Manager{
 		factory:     factory,
@@ -29,7 +30,7 @@ func NewManager(factory Factory, concurrency, interval int, logger log.Logger) *
 type Manager struct {
 	factory     Factory
 	concurrency int
-	interval    int //sleep interval in min
+	interval    int //sleep interval in sec
 	logger      log.Logger
 
 	//run control
@@ -44,6 +45,8 @@ type Manager struct {
 	//current transforms
 	mu         sync.Mutex            // guards transforms
 	transforms map[string]*Transform // ID -> transform
+
+	debug bool
 }
 
 //provider creates and run trusforms (factory function)
@@ -83,9 +86,9 @@ Loop:
 			//release context
 			m.cancel()
 			//sleep
-			m.Pause()
-			m.timer = time.AfterFunc(time.Duration(m.interval)*time.Minute, m.play)
-		case _, ok := <-m.chWork:
+			m.chWork = nil
+			m.timer = time.AfterFunc(time.Duration(m.interval)*time.Second, m.play)
+		case _, ok := <-m.chControl:
 			//flow control
 			if ok {
 				//restart loop
@@ -197,8 +200,7 @@ func (m *Manager) doWork(ctx context.Context) {
 //TODO add transforms limit??
 func (m *Manager) runQueue(ctx context.Context, provider provider, monitor bool) (err error) {
 	sem := make(chan bool, m.concurrency)
-	run := true
-	for run {
+	for {
 		sem <- true
 		//fetch next transform
 		//TODO check context done?
@@ -210,7 +212,7 @@ func (m *Manager) runQueue(ctx context.Context, provider provider, monitor bool)
 			//release semafor
 			<-sem
 			//stop loop
-			run = false
+			break
 		} else {
 			//monitor transform
 			if monitor {
