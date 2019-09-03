@@ -131,6 +131,9 @@ func (m *Manager) Start() {
 //Pause cancels current operation and blocks manager machine
 //non blocking
 func (m *Manager) Pause() {
+	if !m.IsStarted() {
+		return
+	}
 	if m.timer != nil {
 		m.timer.Stop()
 	}
@@ -144,6 +147,12 @@ func (m *Manager) Pause() {
 //play resume machine
 //non blocking
 func (m *Manager) play() {
+	if !m.IsStarted() {
+		return
+	}
+	if m.IsRunning() {
+		return
+	}
 	if m.timer != nil {
 		m.timer.Stop()
 	}
