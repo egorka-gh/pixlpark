@@ -9,7 +9,7 @@ import (
 )
 
 //NewManager creates manager
-func NewManager(factory *Factory, concurrency, interval int, logger log.Logger) *Manager {
+func NewManager(factory Factory, concurrency, interval int, logger log.Logger) *Manager {
 	if concurrency < 1 {
 		concurrency = 1
 	}
@@ -27,7 +27,7 @@ func NewManager(factory *Factory, concurrency, interval int, logger log.Logger) 
 
 // Manager is queue manager of transform items (Transform)
 type Manager struct {
-	factory     *Factory
+	factory     Factory
 	concurrency int
 	interval    int //sleep interval in min
 	logger      log.Logger

@@ -19,7 +19,7 @@ import (
 // An error is returned via Transform.Err. Transform.Err
 // will block the caller until the transform is completed, successfully or
 // otherwise.
-func (fc *Factory) DoOrder(ctx context.Context, id string) *Transform {
+func (fc *baseFactory) DoOrder(ctx context.Context, id string) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -45,7 +45,7 @@ func (fc *Factory) DoOrder(ctx context.Context, id string) *Transform {
 }
 
 //ResetStarted resets orders in state statePixelLoadStarted to state statePixelStartLoad (4 debug only)
-func (fc *Factory) ResetStarted(ctx context.Context) *Transform {
+func (fc *baseFactory) ResetStarted(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -71,7 +71,7 @@ func (fc *Factory) ResetStarted(ctx context.Context) *Transform {
 //expects ID in dummy t.ppOrder
 //on success t is not closed (valid for processing)
 //TODO 4 production add states check
-func (fc *Factory) getOrder(t *Transform) stateFunc {
+func (fc *baseFactory) getOrder(t *Transform) stateFunc {
 	fc.log("getOrder", t.ppOrder.ID)
 	if !fc.Debug {
 		t.err = errors.New("DoOrder can be used only in debug mode")
@@ -106,7 +106,7 @@ func (fc *Factory) getOrder(t *Transform) stateFunc {
 }
 
 //resetFetched - reset orders in statePixelLoadStarted (4 dubug only)
-func (fc *Factory) resetFetched(t *Transform) stateFunc {
+func (fc *baseFactory) resetFetched(t *Transform) stateFunc {
 	doFetch := true
 	skip := 0
 	//while has some orders in statePixelLoadStarted

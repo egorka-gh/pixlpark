@@ -21,7 +21,24 @@ import (
 
 // Factory is factory of transform item (Transform)
 // creates transform item and defines transform process
-type Factory struct {
+type Factory interface {
+	// LoadNew main sequence
+	// fetch new order and perfom full trunsform
+	LoadNew(ctx context.Context) *Transform
+	//LoadRestart reload orders that allready started (statePixelLoadStarted)
+	LoadRestart(ctx context.Context) *Transform
+	//TransformRestart restart incompleted transforms
+	TransformRestart(ctx context.Context) *Transform
+	//FinalizeRestart updates states for complited transforms
+	FinalizeRestart(ctx context.Context) *Transform
+
+	// DoOrder loads order and perfom full trunsform (4 tests only)
+	DoOrder(ctx context.Context, id string) *Transform
+}
+
+// Factory is factory of transform item (Transform)
+// creates transform item and defines transform process
+type baseFactory struct {
 	ppClient    pp.PPService
 	pcClient    pc.Repository
 	source      int
@@ -79,8 +96,8 @@ var (
 )
 
 // NewFactory returns a new transform Factory, using provided configuration.
-func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse int, workFolder, resultFolder, pixlparkUserEmail string, logger log.Logger) *Factory {
-	return &Factory{
+func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse int, workFolder, resultFolder, pixlparkUserEmail string, logger log.Logger) Factory {
+	return &baseFactory{
 		ppClient:    pixlparkClient,
 		pcClient:    photocycleClient,
 		source:      sourse,
@@ -102,7 +119,7 @@ func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sou
 // An error is returned via Transform.Err. Transform.Err
 // will block the caller until the transform is completed, successfully or
 // otherwise.
-func (fc *Factory) LoadNew(ctx context.Context) *Transform {
+func (fc *baseFactory) LoadNew(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -130,7 +147,7 @@ func (fc *Factory) LoadNew(ctx context.Context) *Transform {
 // but not complete for some reason (service stop, some error while load, unzip)
 // behavior same as LoadNew exepct fetch orders in state statePixelLoadStarted
 // get ordrers vs statePixelLoadStarted in PP && StateLoadWaite in Cycle
-func (fc *Factory) LoadRestart(ctx context.Context) *Transform {
+func (fc *baseFactory) LoadRestart(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -158,7 +175,7 @@ func (fc *Factory) LoadRestart(ctx context.Context) *Transform {
 // orders that loaded and unziped but not complete for some reason (service stop or some error while transform)
 // behavior same as LoadNew exepct fetch orders method
 // get ordrers vs statePixelLoadStarted in PP && StateUnzip in Cycle
-func (fc *Factory) TransformRestart(ctx context.Context) *Transform {
+func (fc *baseFactory) TransformRestart(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -188,7 +205,7 @@ func (fc *Factory) TransformRestart(ctx context.Context) *Transform {
 // behavior is different
 // allways returns complited transform
 // do all in one step
-func (fc *Factory) FinalizeRestart(ctx context.Context) *Transform {
+func (fc *baseFactory) FinalizeRestart(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -223,7 +240,7 @@ type stateFunc func(*Transform) stateFunc
 // run calls the given stateFunc function and all subsequent returned stateFuncs
 // until a stateFunc returns nil or the Transform.ctx is canceled. Each stateFunc
 // should mutate the state of the given Transform until it has completed or failed.
-func (fc *Factory) run(t *Transform, f stateFunc) {
+func (fc *baseFactory) run(t *Transform, f stateFunc) {
 	for {
 		select {
 		case <-t.ctx.Done():
@@ -242,7 +259,7 @@ func (fc *Factory) run(t *Transform, f stateFunc) {
 	}
 }
 
-func (fc *Factory) log(key, massage string) {
+func (fc *baseFactory) log(key, massage string) {
 	if fc.logger != nil {
 		fc.logger.Log(key, massage)
 	}
@@ -255,7 +272,7 @@ func (fc *Factory) log(key, massage string) {
 //fetch in PP state statePixelStartLoad or statePixelLoadStarted
 //fetched order moves to statePixelLoadStarted in PP and to StateLoadWaite in cycle
 //must check order state in cycle (not implemented)
-func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
+func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 	fc.log("fetchState", t.fetchState)
 	//TODO scan all queue vs t.fetchState
 	orders, err := fc.ppClient.GetOrders(t.ctx, t.fetchState, 0, 0, 20, 0)
@@ -301,7 +318,7 @@ func (fc *Factory) fetchToLoad(t *Transform) stateFunc {
 //on success t is not closed (valid for processing)
 //if there is no orders returns ErrEmptyQueue
 //fetch in PP state statePixelLoadStarted & cycle state StateUnzip
-func (fc *Factory) fetchToTransform(t *Transform) stateFunc {
+func (fc *baseFactory) fetchToTransform(t *Transform) stateFunc {
 	//get one from cycle
 	var err error
 	t.pcBaseOrder, err = fc.pcClient.LoadBaseOrderByState(t.ctx, fc.source, pc.StateUnzip)
@@ -341,7 +358,7 @@ func (fc *Factory) fetchToTransform(t *Transform) stateFunc {
 // and moves to state StatePreprocessWaite
 //bloks till process all
 //allways returns complited transform
-func (fc *Factory) doFinalize(t *Transform) stateFunc {
+func (fc *baseFactory) doFinalize(t *Transform) stateFunc {
 	//get order list from DB
 	orders, err := fc.pcClient.LoadBaseOrderByChildState(t.ctx, fc.source, pc.StateUnzip, pc.StateLoadComplite)
 	if err != nil {
@@ -389,7 +406,7 @@ func (fc *Factory) doFinalize(t *Transform) stateFunc {
 
 //start grab client to load zip
 //in/out states statePixelLoadStarted in PP and StateLoadWaite in cycle
-func (fc *Factory) loadZIP(t *Transform) stateFunc {
+func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
 	fc.log("loadZIP", t.ppOrder.ID)
 
 	loader := grab.NewClient()
@@ -438,7 +455,7 @@ func (fc *Factory) loadZIP(t *Transform) stateFunc {
 //unpack zip
 //in states: statePixelLoadStarted in PP and StateLoadWaite in cycle
 //out states: statePixelLoadStarted in PP and StateUnzip (StateLoadWaite on error) in cycle
-func (fc *Factory) unzip(t *Transform) stateFunc {
+func (fc *baseFactory) unzip(t *Transform) stateFunc {
 	//TODO err limiter??
 	started := time.Now()
 	fc.log("unzip", t.ppOrder.ID)
@@ -543,7 +560,7 @@ func (fc *Factory) unzip(t *Transform) stateFunc {
 // if error while move created orders to StatePreprocessWaite in cycle
 // get by state StateLoadComplite check state StatePrinting in pp and try set cycle state again (not implemented)
 //		pp - StatePrinting; cycle - base: StateUnzip; orders: StateLoadComplite
-func (fc *Factory) transformItems(t *Transform) stateFunc {
+func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 	var err error
 
 	fc.log("transformItems", t.ppOrder.ID)
@@ -647,7 +664,7 @@ func (fc *Factory) transformItems(t *Transform) stateFunc {
 }
 
 // closeTransform finalizes the Transform
-func (fc *Factory) closeTransform(t *Transform) stateFunc {
+func (fc *baseFactory) closeTransform(t *Transform) stateFunc {
 	if t.IsComplete() {
 		panic("transform: developer error: transform already closed")
 	}
@@ -676,7 +693,7 @@ func (fc *Factory) closeTransform(t *Transform) stateFunc {
 }
 
 //check states in cycle
-func (fc *Factory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, err error) {
+func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, err error) {
 	//load/check state from all orders by group
 	states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, co.GroupID)
 	if err != nil {
@@ -727,7 +744,7 @@ func (fc *Factory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, err e
 }
 
 //finalize complete transform
-func (fc *Factory) finish(t *Transform, restarted bool) error {
+func (fc *baseFactory) finish(t *Transform, restarted bool) error {
 	var err error
 	if restarted == false && fc.Debug == false {
 		//set state in pp
@@ -757,7 +774,7 @@ func (fc *Factory) finish(t *Transform, restarted bool) error {
 	return nil
 }
 
-func (fc *Factory) setPixelState(t *Transform, state, message string) error {
+func (fc *baseFactory) setPixelState(t *Transform, state, message string) error {
 	var err error
 	if fc.Debug {
 		//do nothing
@@ -772,7 +789,7 @@ func (fc *Factory) setPixelState(t *Transform, state, message string) error {
 	return err
 }
 
-func (fc *Factory) setCycleState(t *Transform, state int, logState int, message string) error {
+func (fc *baseFactory) setCycleState(t *Transform, state int, logState int, message string) error {
 	var err error
 	if state != 0 {
 		err = fc.pcClient.SetOrderState(t.ctx, t.pcBaseOrder.ID, state)

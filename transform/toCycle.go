@@ -24,7 +24,7 @@ type fileCopy struct {
 	BookIdx  int
 }
 
-func (fc *Factory) transformAlias(ctx context.Context, item pp.OrderItem, order *pc.Order) error {
+func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, order *pc.Order) error {
 	//try build by alias
 	a, ok := item.Sku()["alias"]
 	if !ok || a == "" {
