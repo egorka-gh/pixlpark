@@ -19,6 +19,15 @@ func createProvider(name string, calls int32, counter chan<- int) provider {
 			ctx:     ctx,
 			ppOrder: pp.Order{ID: fmt.Sprintf("%d", send+1)},
 		}
+		if ctx.Err() != nil {
+			//canceled
+			t.err = ctx.Err()
+			close(t.Done)
+			send = 0
+			fmt.Printf("%s canceled\n", name)
+			return t
+		}
+
 		if send >= calls {
 			//complited
 			t.err = ErrEmptyQueue{errors.New("Complite")}
@@ -27,12 +36,18 @@ func createProvider(name string, calls int32, counter chan<- int) provider {
 			fmt.Printf("%s complite (%d)\n", name, send)
 			return t
 		}
-		fmt.Printf("%s sending %s\n", name, t.ID())
+		//fmt.Printf("%s sending %s\n", name, t.ID())
 		send++
 		go func(t *Transform) {
-			time.Sleep(100 * time.Millisecond)
-			fmt.Printf("%s closing %s\n", name, t.ID())
-			counter <- 1
+			time.Sleep(300 * time.Millisecond)
+			if ctx.Err() != nil {
+				//canceled
+				t.err = ctx.Err()
+				fmt.Printf("%s canceled\n", name)
+			} else {
+				fmt.Printf("%s closing %s\n", name, t.ID())
+				counter <- 1
+			}
 			close(t.Done)
 		}(t)
 		return t
@@ -188,4 +203,64 @@ func Test_runManager(t *testing.T) {
 		t.Errorf("Expected run time > %d got %.2f", ((int(cycles) - 1) * m.interval), runSec)
 	}
 
+}
+
+func Test_pauseManager(t *testing.T) {
+	var calls int32 = 3
+	var cycles int32 = 5
+	var doneCalls int32
+
+	chCounter := make(chan int, 4*cycles*calls)
+	f, chDone := createFactory(calls, cycles, chCounter)
+
+	m := NewManager(f, 1, 5, nil)
+	//3ces interval
+	m.interval = 3
+
+	go func() {
+		select {
+		case <-chDone:
+			fmt.Printf("Quiting manager\n")
+			m.Quit()
+		}
+	}()
+
+	paused1 := false
+	paused2 := false
+	//pause while sleep
+	m.Start()
+	fmt.Printf("Manager started\n")
+	time.AfterFunc(4*time.Second, func() {
+		m.Pause()
+		fmt.Printf("Paused 1 done\n")
+	})
+	time.AfterFunc(4*time.Second+100*time.Millisecond, func() {
+		paused1 = !m.IsRunning()
+		m.Start()
+		fmt.Printf("Manager started\n")
+		//pause while running
+		time.AfterFunc(500*time.Millisecond, func() {
+			m.Pause()
+			fmt.Printf("Manager paused 2\n")
+		})
+		time.AfterFunc(800*time.Millisecond, func() {
+			paused2 = !m.IsRunning()
+			fmt.Printf("Manager quit\n")
+			m.Quit()
+		})
+	})
+	m.Wait()
+
+	close(chCounter)
+	fmt.Printf("Manager complite\n")
+	for range chCounter {
+		doneCalls++
+	}
+
+	if !paused1 {
+		t.Errorf("Manager not paused while sleeping")
+	}
+	if !paused2 {
+		t.Errorf("Manager not paused while running")
+	}
 }

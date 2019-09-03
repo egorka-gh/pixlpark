@@ -109,6 +109,7 @@ func (m *Manager) Start() {
 	//resume if started
 	if m.IsStarted() {
 		m.play()
+		return
 	}
 
 	//init control
