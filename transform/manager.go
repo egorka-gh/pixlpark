@@ -17,6 +17,9 @@ func NewManager(factory Factory, concurrency, interval int, logger log.Logger) *
 		interval = 5
 	}
 	interval = interval * 60
+	if logger == nil {
+		logger = log.NewNopLogger()
+	}
 
 	return &Manager{
 		factory:     factory,
@@ -111,6 +114,7 @@ func (m *Manager) Start() {
 		m.play()
 		return
 	}
+	m.logger.Log("Start", "")
 
 	//init control
 	// chWork, chWorkBackup
@@ -176,6 +180,7 @@ func (m *Manager) play() {
 //non blocking
 //any calls to Start and Pause will panic (send to closed chControl)
 func (m *Manager) Quit() {
+	m.logger.Log("Quit", "")
 	if m.timer != nil {
 		m.timer.Stop()
 	}
@@ -196,6 +201,7 @@ func (m *Manager) doWork(ctx context.Context) {
 	//load new
 	err := m.runQueue(ctx, m.factory.LoadNew, true)
 	if err != nil || ctx.Err() != nil {
+		m.logNotNilErr("LoadNew", err, ctx.Err())
 		return
 	}
 
@@ -204,26 +210,38 @@ func (m *Manager) doWork(ctx context.Context) {
 	//finalize prepared
 	err = m.runQueue(ctx, m.factory.FinalizeRestart, true)
 	if err != nil || ctx.Err() != nil {
+		m.logNotNilErr("FinalizeRestart", err, ctx.Err())
 		return
 	}
 	//restart broken transforms
 	err = m.runQueue(ctx, m.factory.TransformRestart, true)
 	if err != nil || ctx.Err() != nil {
+		m.logNotNilErr("TransformRestart", err, ctx.Err())
 		return
 	}
 	//restart broken loads
 	err = m.runQueue(ctx, m.factory.LoadRestart, true)
 	if err != nil || ctx.Err() != nil {
+		m.logNotNilErr("LoadRestart", err, ctx.Err())
 		return
 	}
 
+}
+
+func (m *Manager) logNotNilErr(key string, errs ...error) {
+	for _, e := range errs {
+		if e != nil {
+			m.logger.Log(key, e)
+			break
+		}
+	}
 }
 
 //TODO add transforms limit??
 func (m *Manager) runQueue(ctx context.Context, provider provider, monitor bool) (err error) {
 	sem := make(chan bool, m.concurrency)
 	for {
-		//waite concurrency
+		//waite concurrency limit
 		sem <- true
 		//check context done
 		if ctx.Err() != nil {
