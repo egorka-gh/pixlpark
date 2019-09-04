@@ -131,6 +131,12 @@ func (m *Manager) Start() {
 //Pause cancels current operation and blocks manager machine
 //non blocking
 func (m *Manager) Pause() {
+	defer func() {
+		//recover from posible write to closed chan
+		if r := recover(); r != nil {
+			m.logger.Log("Pause.Panic", r)
+		}
+	}()
 	if !m.IsStarted() {
 		return
 	}
@@ -147,6 +153,12 @@ func (m *Manager) Pause() {
 //play resume machine
 //non blocking
 func (m *Manager) play() {
+	defer func() {
+		//recover from posible write to closed chan
+		if r := recover(); r != nil {
+			m.logger.Log("play.Panic", r)
+		}
+	}()
 	if !m.IsStarted() {
 		return
 	}
@@ -211,9 +223,18 @@ func (m *Manager) doWork(ctx context.Context) {
 func (m *Manager) runQueue(ctx context.Context, provider provider, monitor bool) (err error) {
 	sem := make(chan bool, m.concurrency)
 	for {
+		//waite concurrency
 		sem <- true
+		//check context done
+		if ctx.Err() != nil {
+			//canceled
+			err = ctx.Err()
+			//release semafor
+			<-sem
+			//stop loop
+			break
+		}
 		//fetch next transform
-		//TODO check context done?
 		t := provider(ctx)
 		if t.IsComplete() {
 			if _, ok := t.Err().(ErrEmptyQueue); ok == false {

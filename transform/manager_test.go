@@ -164,6 +164,34 @@ func Test_runQueue(t *testing.T) {
 	}
 }
 
+func Test_cancelQueue(t *testing.T) {
+	m := &Manager{
+		concurrency: 2,
+	}
+	var calls int32 = 20
+	var doneCalls int32
+	chCounter := make(chan int, calls)
+
+	p := createProvider("Provider", calls, chCounter)
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(time.Second, func() {
+		cancel()
+		fmt.Printf("Context canceled\n")
+	})
+	err := m.runQueue(ctx, p, false)
+	close(chCounter)
+	for range chCounter {
+		doneCalls++
+	}
+
+	if err == nil {
+		t.Errorf("Expect error 'context canceled' got nil")
+	}
+	if doneCalls == calls {
+		t.Errorf("runQueue not canceled")
+	}
+}
+
 func Test_runManager(t *testing.T) {
 	var calls int32 = 3
 	var cycles int32 = 5
@@ -198,9 +226,86 @@ func Test_runManager(t *testing.T) {
 	if doneCalls != 4*cycles*calls {
 		t.Errorf("Expected calls %d got %d", 4*cycles*calls, doneCalls)
 	}
+	expecT := float64((int(cycles)-1)*m.interval) + 0.3*float64(cycles)
+	if runSec < expecT {
+		t.Errorf("Expected run time > %.2f got %.2f", expecT, runSec)
+	}
 
-	if runSec < float64((int(cycles)-1)*m.interval) {
-		t.Errorf("Expected run time > %d got %.2f", ((int(cycles) - 1) * m.interval), runSec)
+}
+
+func Test_quitManager(t *testing.T) {
+	var calls int32 = 10
+	var cycles int32 = 20
+	var doneCalls int32
+
+	//quit while running
+	chCounter := make(chan int, 4*cycles*calls)
+	f, chDone := createFactory(calls, cycles, chCounter)
+	m := NewManager(f, 1, 5, nil)
+	//10ces interval
+	m.interval = 10
+	go func() {
+		select {
+		case <-chDone:
+			t.Errorf("Unexpected manager quit")
+			m.Quit()
+		}
+	}()
+	start := time.Now()
+	m.Start()
+	fmt.Printf("Manager started\n")
+	time.AfterFunc(time.Second, func() {
+		m.Quit()
+		fmt.Printf("Quit while running done\n")
+	})
+	m.Wait()
+	runSec := time.Since(start).Seconds()
+	close(chCounter)
+	for range chCounter {
+		doneCalls++
+	}
+	if runSec > 2.0 {
+		t.Errorf("Manager not quit while running. Expected run time < %.2fs got %.2f", 2.0, runSec)
+	}
+	if doneCalls == 4*cycles*calls {
+		t.Errorf("Manager not quit while running. Expected calls < %d", 4*cycles*calls)
+	}
+
+	//quit while pause
+	calls = 1
+	chCounter = make(chan int, 4*cycles*calls)
+	f, chDone = createFactory(calls, cycles, chCounter)
+	m = NewManager(f, 1, 5, nil)
+	//10ces interval
+	m.interval = 10
+	go func() {
+		select {
+		case <-chDone:
+			t.Errorf("Unexpected manager quit")
+			m.Quit()
+		}
+	}()
+	start = time.Now()
+	m.Start()
+	fmt.Printf("Manager started\n")
+	time.AfterFunc(3*time.Second, func() {
+		if m.IsRunning() {
+			t.Errorf("Manager is running, you missed")
+		}
+		m.Quit()
+		fmt.Printf("Quit while pause done\n")
+	})
+	m.Wait()
+	runSec = time.Since(start).Seconds()
+	close(chCounter)
+	for range chCounter {
+		doneCalls++
+	}
+	if runSec > 4 {
+		t.Errorf("Manager not quit while paused. Expected run time < %.2fs got %.2f", 4.0, runSec)
+	}
+	if doneCalls == 4*cycles*calls {
+		t.Errorf("Manager not quit while paused. Expected calls < %d", 4*cycles*calls)
 	}
 
 }
