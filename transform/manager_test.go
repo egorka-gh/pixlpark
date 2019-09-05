@@ -139,7 +139,7 @@ func Test_runQueue(t *testing.T) {
 		atomic.AddInt32(&send, 1)
 		go func(t *Transform) {
 			time.Sleep(300 * time.Millisecond)
-			fmt.Printf("Closing %s; monitor %d\n", t.ID(), len(m.transforms))
+			fmt.Printf("Closing %s\n", t.ID())
 			close(t.Done)
 			atomic.AddInt32(&done, 1)
 		}(t)

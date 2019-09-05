@@ -49,7 +49,9 @@ type Manager struct {
 	mu         sync.Mutex            // guards transforms
 	transforms map[string]*Transform // ID -> transform
 
-	debug bool
+	//current state (human-friendly)
+	currState string
+	debug     bool
 }
 
 //provider creates and run trusforms (factory function)
@@ -86,11 +88,16 @@ Loop:
 			//create context
 			ctx, m.cancel = context.WithCancel(context.Background())
 			m.doWork(ctx)
-			//release context
-			m.cancel()
-			//sleep
-			m.chWork = nil
-			m.timer = time.AfterFunc(time.Duration(m.interval)*time.Second, m.play)
+			//contex canceled?
+			if ctx.Err() == nil {
+				//release context
+				m.cancel()
+				//sleep
+				m.mu.Lock()
+				m.chWork = nil
+				m.timer = time.AfterFunc(time.Duration(m.interval)*time.Second, m.play)
+				m.mu.Unlock()
+			}
 		case _, ok := <-m.chControl:
 			//flow control
 			if ok {
@@ -144,14 +151,19 @@ func (m *Manager) Pause() {
 	if !m.IsStarted() {
 		return
 	}
-	if m.timer != nil {
-		m.timer.Stop()
-	}
 	if m.cancel != nil {
 		m.cancel()
 	}
+
+	m.mu.Lock()
+	if m.timer != nil {
+		m.timer.Stop()
+	}
 	m.chWork = nil
+	m.mu.Unlock()
+
 	m.chControl <- struct{}{}
+	m.currState = "Пауза"
 }
 
 //play resume machine
@@ -169,10 +181,12 @@ func (m *Manager) play() {
 	if m.IsRunning() {
 		return
 	}
+	m.mu.Lock()
 	if m.timer != nil {
 		m.timer.Stop()
 	}
 	m.chWork = m.chWorkBackup
+	m.mu.Unlock()
 	m.chControl <- struct{}{}
 }
 
@@ -188,6 +202,7 @@ func (m *Manager) Quit() {
 		m.cancel()
 	}
 	m.chWork = nil
+	m.currState = "Остановка"
 	close(m.chControl)
 }
 
@@ -199,6 +214,7 @@ func (m *Manager) Wait() {
 //run regular sequense, new first then restart stuck orders
 func (m *Manager) doWork(ctx context.Context) {
 	//load new
+	m.currState = "Загрузка"
 	err := m.runQueue(ctx, m.factory.LoadNew, true)
 	if err != nil || ctx.Err() != nil {
 		m.logNotNilErr("LoadNew", err, ctx.Err())
@@ -208,24 +224,28 @@ func (m *Manager) doWork(ctx context.Context) {
 	//run restarters
 
 	//finalize prepared
-	err = m.runQueue(ctx, m.factory.FinalizeRestart, true)
+	m.currState = "Перезапуск не завершенных"
+	err = m.runQueue(ctx, m.factory.FinalizeRestart, false)
 	if err != nil || ctx.Err() != nil {
 		m.logNotNilErr("FinalizeRestart", err, ctx.Err())
 		return
 	}
 	//restart broken transforms
-	err = m.runQueue(ctx, m.factory.TransformRestart, true)
+	m.currState = "Перезапуск не подготовленных"
+	err = m.runQueue(ctx, m.factory.TransformRestart, false)
 	if err != nil || ctx.Err() != nil {
 		m.logNotNilErr("TransformRestart", err, ctx.Err())
 		return
 	}
 	//restart broken loads
+	m.currState = "Перезапуск не загруженных"
 	err = m.runQueue(ctx, m.factory.LoadRestart, true)
 	if err != nil || ctx.Err() != nil {
 		m.logNotNilErr("LoadRestart", err, ctx.Err())
 		return
 	}
 
+	m.currState = "Ожидание"
 }
 
 func (m *Manager) logNotNilErr(key string, errs ...error) {
