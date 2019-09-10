@@ -179,8 +179,9 @@ type OrderItemOption struct {
 
 // OrderItemSizes represent pp Order Item EditorOutput
 type OrderItemSizes struct {
-	Height float64 `json:"Height"`
-	Width  float64 `json:"Width"`
+	Height    float64 `json:"Height"`
+	Width     float64 `json:"Width"`
+	Thickness float64 `json:"Thickness"`
 }
 
 // OrderItemSku represent pp Order Item SKU

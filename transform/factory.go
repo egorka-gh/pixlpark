@@ -34,6 +34,8 @@ type Factory interface {
 
 	// DoOrder loads order and perfom full trunsform (4 tests only)
 	DoOrder(ctx context.Context, id string) *Transform
+
+	SetDebug(debug bool)
 }
 
 // Factory is factory of transform item (Transform)
@@ -106,6 +108,10 @@ func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sou
 		ppUser:      pixlparkUserEmail,
 		logger:      logger,
 	}
+}
+
+func (fc *baseFactory) SetDebug(debug bool) {
+	fc.Debug = debug
 }
 
 // LoadNew main sequence

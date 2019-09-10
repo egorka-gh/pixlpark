@@ -84,7 +84,7 @@ Loop:
 	for {
 		select {
 		case <-m.chWork:
-			//run regular fetching vs specified interval
+			//run work vs specified interval
 			//create context
 			ctx, m.cancel = context.WithCancel(context.Background())
 			m.doWork(ctx)

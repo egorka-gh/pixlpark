@@ -70,7 +70,7 @@ func main() {
 		return
 	}
 	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
-	fc.Debug = true
+	fc.SetDebug(true)
 	//oid := "1874839**"
 	fmt.Printf("Страт заказа %s\n", oid)
 	transf := fc.DoOrder(context.Background(), oid)

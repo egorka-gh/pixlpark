@@ -77,6 +77,9 @@ func (f *testFactory) FinalizeRestart(ctx context.Context) *Transform {
 func (f *testFactory) DoOrder(ctx context.Context, notused string) *Transform {
 	return f.doOrder(ctx)
 }
+func (f *testFactory) SetDebug(debug bool) {
+	//noop
+}
 
 func createFactory(callsPerCycle, cycles int32, counter chan<- int) (Factory, chan struct{}) {
 	done := make(chan struct{})
