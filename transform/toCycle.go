@@ -3,6 +3,7 @@ package transform
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -23,6 +24,37 @@ type fileCopy struct {
 	NoCopy   bool
 	SheetIdx int
 	BookIdx  int
+}
+
+func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, order *pc.Order) error {
+	p, ok := item.Sku()["paper"]
+	if !ok || p == "" {
+		return ErrCantTransform{errors.New("Не указан алиас бумаги (paper)")}
+	}
+	paper, err := strconv.Atoi(p)
+	if err != nil || paper == 0 {
+		return ErrTransform{fmt.Errorf("Не верное значение алиаса бумаги (paper) %s", p)}
+	}
+
+	w, ok := item.Sku()["width"]
+	if !ok || w == "" {
+		return ErrCantTransform{errors.New("Не указан алиас ширины (width)")}
+	}
+	width, err := strconv.Atoi(w)
+	if err != nil || width == 0 {
+		return ErrTransform{fmt.Errorf("Не верное значение алиаса ширины (width) %s", w)}
+	}
+
+	h, ok := item.Sku()["height"]
+	if !ok || h == "" {
+		return ErrCantTransform{errors.New("Не указан алиас длины (height)")}
+	}
+	height, err := strconv.Atoi(h)
+	if err != nil || height == 0 {
+		return ErrTransform{fmt.Errorf("Не верное значение алиаса длины (height) %s", h)}
+	}
+
+	return nil
 }
 
 func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, order *pc.Order) error {
