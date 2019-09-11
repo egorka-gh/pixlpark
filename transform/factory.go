@@ -41,14 +41,15 @@ type Factory interface {
 // Factory is factory of transform item (Transform)
 // creates transform item and defines transform process
 type baseFactory struct {
-	ppClient    pp.PPService
-	pcClient    pc.Repository
-	source      int
-	wrkFolder   string
-	cycleFolder string
-	ppUser      string
-	logger      log.Logger
-	Debug       bool
+	ppClient       pp.PPService
+	pcClient       pc.Repository
+	source         int
+	wrkFolder      string
+	cycleFolder    string
+	cyclePrtFolder string
+	ppUser         string
+	logger         log.Logger
+	Debug          bool
 }
 
 //internal errors, factory has to make decision what to do (rise error or proceed transform)
@@ -98,15 +99,16 @@ var (
 )
 
 // NewFactory returns a new transform Factory, using provided configuration.
-func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse int, workFolder, resultFolder, pixlparkUserEmail string, logger log.Logger) Factory {
+func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse int, workFolder, cycleFolder, cyclePrtFolder, pixlparkUserEmail string, logger log.Logger) Factory {
 	return &baseFactory{
-		ppClient:    pixlparkClient,
-		pcClient:    photocycleClient,
-		source:      sourse,
-		wrkFolder:   workFolder,
-		cycleFolder: resultFolder,
-		ppUser:      pixlparkUserEmail,
-		logger:      logger,
+		ppClient:       pixlparkClient,
+		pcClient:       photocycleClient,
+		source:         sourse,
+		wrkFolder:      workFolder,
+		cycleFolder:    cycleFolder,
+		cyclePrtFolder: cyclePrtFolder,
+		ppUser:         pixlparkUserEmail,
+		logger:         logger,
 	}
 }
 
@@ -421,7 +423,7 @@ func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
 	if err := os.Remove(fl); err != nil && !os.IsNotExist(err) {
 		t.err = ErrFileSystem{err}
 	}
-	if err := os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID)); err != nil && !os.IsNotExist(err) {
+	if err := os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID)); err != nil {
 		t.err = ErrFileSystem{err}
 	}
 	if t.err != nil {
@@ -605,8 +607,8 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		//try build by alias
 		err = fc.transformAlias(t.ctx, item, &co)
 		if _, ok := err.(ErrCantTransform); ok == true {
-			//try another method
-			//TODO implement photo print
+			//try build photo print
+			err = fc.transformPhoto(t.ctx, item, &co)
 		}
 		if err != nil {
 			incomlete = true

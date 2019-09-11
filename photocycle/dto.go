@@ -48,8 +48,9 @@ type Order struct {
 	Production  int       `json:"production" db:"production"`
 
 	//4 internal use
-	ExtraInfo OrderExtraInfo
-	HasCover  bool
+	ExtraInfo   OrderExtraInfo
+	HasCover    bool
+	PrintGroups []PrintGroup
 }
 
 //GroupState is dto for orders states by GroupID
@@ -101,6 +102,18 @@ type PrintGroup struct {
 	IsPDF     bool      `json:"is_pdf" db:"is_pdf"`
 	IsDuplex  bool      `json:"is_duplex" db:"is_duplex"`
 	Butt      int       `json:"butt" db:"butt"`
+
+	//4 internal use
+	Files []PrintGroupFile
 }
 
-//TODO add print_group_file
+//PrintGroupFile represents the print_group_file of db object
+type PrintGroupFile struct {
+	PrintGroupID string `json:"print_group" db:"print_group"`
+	FileName     string `json:"file_name" db:"file_name"`
+	PrintQtty    int    `json:"prt_qty" db:"prt_qty"`
+	Book         int    `json:"book_num" db:"book_num"`
+	Page         int    `json:"page_num" db:"page_num"`
+	Caption      string `json:"caption" db:"caption"`
+	BookPart     int    `json:"book_part" db:"book_part"`
+}

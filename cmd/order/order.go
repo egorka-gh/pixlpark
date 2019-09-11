@@ -69,7 +69,7 @@ func main() {
 		fmt.Printf("Ошибка подключения к базе данных %s\n", err.Error())
 		return
 	}
-	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
+	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
 	fc.SetDebug(true)
 	//oid := "1874839**"
 	fmt.Printf("Страт заказа %s\n", oid)

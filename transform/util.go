@@ -45,6 +45,15 @@ func folderOpen(path string) (*os.File, error) {
 	return file, nil
 }
 
+func folderExists(path string) bool {
+	f, err := folderOpen(path)
+	if err != nil {
+		return false
+	}
+	f.Close()
+	return true
+}
+
 func copyFile(src, dst string) (err error) {
 	sfi, err := os.Stat(src)
 	if err != nil {
@@ -78,4 +87,11 @@ func copyFile(src, dst string) (err error) {
 	}
 	err = out.Sync()
 	return
+}
+
+func recreateFolder(path string) error {
+	if err := os.RemoveAll(path); err != nil {
+		return err
+	}
+	return os.MkdirAll(path, 0755)
 }
