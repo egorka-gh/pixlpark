@@ -46,12 +46,6 @@ func (b *basicRepository) CreateOrder(ctx context.Context, o cycle.Order) error 
 	var ssql = sb.String()
 	_, err := b.db.ExecContext(ctx, ssql, o.ID, o.Source, o.SourceID, o.SourceDate, o.DataTS, o.State, o.GroupID, o.FtpFolder, o.FotosNum, o.ClientID, o.Production)
 	return err
-	/*
-		//ignore ErrNoRows ??
-		if err != nil && err == sql.ErrNoRows {
-			return res, nil
-		}
-	*/
 }
 
 func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) error {
@@ -126,15 +120,21 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 	return t.Commit()
 }
 
-func (b *basicRepository) ClearGroup(ctx context.Context, group int, keepID string) error {
-	sql := "DELETE FROM orders WHERE group_id = ? AND ID != ?"
-	_, err := b.db.ExecContext(ctx, sql, group, keepID)
+func (b *basicRepository) ClearGroup(ctx context.Context, source, group int, keepID string) error {
+	sql := "DELETE FROM orders WHERE source =? AND group_id = ? AND ID != ?"
+	_, err := b.db.ExecContext(ctx, sql, source, group, keepID)
 	return err
 }
 
-func (b *basicRepository) SetGroupState(ctx context.Context, state, group int, keepID string) error {
-	sql := "UPDATE orders SET state = ? WHERE group_id = ? AND ID != ?"
-	_, err := b.db.ExecContext(ctx, sql, state, group, keepID)
+func (b *basicRepository) SetGroupState(ctx context.Context, source, state, group int, keepID string) error {
+	sql := "UPDATE orders SET state = ? WHERE source =? AND group_id = ? AND ID != ?"
+	_, err := b.db.ExecContext(ctx, sql, state, source, group, keepID)
+	return err
+}
+
+func (b *basicRepository) StartOrders(ctx context.Context, source, group int, skipID string) error {
+	sql := "call pp_StartOrders(?, ?, ?)"
+	_, err := b.db.ExecContext(ctx, sql, source, group, skipID)
 	return err
 }
 
@@ -174,10 +174,10 @@ func (b *basicRepository) AddExtraInfo(ctx context.Context, ei cycle.OrderExtraI
 	return err
 }
 
-func (b *basicRepository) GetGroupState(ctx context.Context, baseID string, group int) (cycle.GroupState, error) {
+func (b *basicRepository) GetGroupState(ctx context.Context, baseID string, source, group int) (cycle.GroupState, error) {
 	var res cycle.GroupState
-	sql := "SELECT IFNULL(MAX(IF(o.id = ?, o.state, 0)), 0) basestate, IFNULL(MAX(IF(o.id = ?, 0, o.state)), 0) childstate FROM orders o WHERE o.group_id = ?"
-	err := b.db.GetContext(ctx, &res, sql, baseID, baseID, group)
+	sql := "SELECT IFNULL(MAX(IF(o.id = ?, o.state, 0)), 0) basestate, IFNULL(MAX(IF(o.id = ?, 0, o.state)), 0) childstate FROM orders o WHERE o.source = ? AND o.group_id = ?"
+	err := b.db.GetContext(ctx, &res, sql, baseID, baseID, source, group)
 	return res, err
 }
 

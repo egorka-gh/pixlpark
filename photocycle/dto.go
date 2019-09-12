@@ -13,13 +13,14 @@ type Repository interface {
 	LogState(ctx context.Context, orderID string, state int, message string) error
 	SetOrderState(ctx context.Context, orderID string, state int) error
 	LoadAlias(ctx context.Context, alias string) (Alias, error)
-	ClearGroup(ctx context.Context, group int, keepID string) error
-	SetGroupState(ctx context.Context, state, group int, keepID string) error
+	ClearGroup(ctx context.Context, source, group int, keepID string) error
 	AddExtraInfo(ctx context.Context, ei OrderExtraInfo) error
-	GetGroupState(ctx context.Context, baseID string, group int) (GroupState, error)
+	SetGroupState(ctx context.Context, source, state, group int, keepID string) error
+	GetGroupState(ctx context.Context, baseID string, source, group int) (GroupState, error)
 	LoadBaseOrderByState(ctx context.Context, source, state int) (Order, error)
 	LoadBaseOrderByChildState(ctx context.Context, source, baseState, childState int) ([]Order, error)
 	FillOrders(ctx context.Context, orders []Order) error
+	StartOrders(ctx context.Context, source, group int, skipID string) error
 	Close()
 }
 
