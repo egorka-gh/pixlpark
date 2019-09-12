@@ -88,7 +88,7 @@ func (fc *baseFactory) getOrder(t *Transform) stateFunc {
 	//try to create
 	fc.pcClient.CreateOrder(t.ctx, co)
 	//clear if allready processed
-	fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)
+	fc.pcClient.ClearGroup(t.ctx, fc.source, co.GroupID, co.ID)
 	//set/reset base state
 	fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
 

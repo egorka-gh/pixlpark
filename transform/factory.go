@@ -649,7 +649,7 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		t.err = ErrTransform{errors.New(msg)}
 	} else {
 		//clear sub orders
-		err = fc.pcClient.ClearGroup(t.ctx, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
+		err = fc.pcClient.ClearGroup(t.ctx, fc.source, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
 		if err != nil {
 			t.err = ErrRepository{err}
 			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
@@ -703,7 +703,7 @@ func (fc *baseFactory) closeTransform(t *Transform) stateFunc {
 //check states in cycle
 func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, err error) {
 	//load/check state from all orders by group
-	states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, co.GroupID)
+	states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, fc.source, co.GroupID)
 	if err != nil {
 		//TODO database not responding??
 		err = ErrRepository{err}
@@ -742,7 +742,7 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 
 	//clear sub orders
 	if states.ChildState > 0 {
-		_ = fc.pcClient.ClearGroup(t.ctx, co.GroupID, co.ID)
+		_ = fc.pcClient.ClearGroup(t.ctx, fc.source, co.GroupID, co.ID)
 	}
 	//reset base state
 	if states.BaseState != co.State {
@@ -766,7 +766,7 @@ func (fc *baseFactory) finish(t *Transform, restarted bool) error {
 
 	//TODO refactor to sql procedure call (pp_StartOrders)
 	//move all cycle orders to state waite preprocess to start in cycle
-	err = fc.pcClient.SetGroupState(t.ctx, pc.StatePreprocessWaite, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
+	err = fc.pcClient.SetGroupState(t.ctx, fc.source, pc.StatePreprocessWaite, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
 	if err != nil {
 		t.err = ErrRepository{err}
 		fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
