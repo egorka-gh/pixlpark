@@ -54,6 +54,78 @@ func (b *basicRepository) CreateOrder(ctx context.Context, o cycle.Order) error 
 	*/
 }
 
+func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) error {
+	//insert orders
+	oSQL := "INSERT INTO orders (id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production) VALUES "
+	oVals := make([]string, 0, len(orders))
+	oArgs := []interface{}{}
+
+	xSQL := "INSERT INTO order_extra_info (id, endpaper, interlayer, cover, format, corner_type, kaptal, cover_material, books, sheets, date_in, book_thickness, group_id, remark, paper, calc_alias, calc_title, weight) VALUES "
+	xVals := make([]string, 0, len(orders))
+	xArgs := []interface{}{}
+
+	pSQL := "INSERT INTO print_group (id, order_id, state, state_date, width, height, paper, frame, correction, cutting, path, alias, file_num, book_type, book_part, book_num, sheet_num, is_pdf, is_duplex, prints, butt) VALUES "
+	pVals := make([]string, 0, len(orders)*2)
+	pArgs := []interface{}{}
+
+	fSQL := "INSERT INTO print_group_file (print_group, file_name, prt_qty, book_num, page_num, caption, book_part) VALUES"
+	fVals := make([]string, 0, len(orders)*2*10)
+	fArgs := []interface{}{}
+
+	for _, o := range orders {
+		//orders
+		oVals = append(oVals, "(?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)")
+		oArgs = append(oArgs, o.ID, o.Source, o.SourceID, o.SourceDate, o.DataTS, o.State, o.GroupID, o.FtpFolder, o.FotosNum, o.ClientID, o.Production)
+		//extra info
+		ei := o.ExtraInfo
+		xVals = append(xVals, "(?, LEFT(?, 100), LEFT(?, 100), LEFT(?, 250), LEFT(?, 250), LEFT(?, 100), LEFT(?, 100), LEFT(?, 250), ?, ?, ?, ?, ?, LEFT(?, 250), LEFT(?, 250), LEFT(?, 50), LEFT(?, 250), ?)")
+		xArgs = append(xArgs, ei.ID, ei.EndPaper, ei.InterLayer, ei.Cover, ei.Format, ei.CornerType, ei.Kaptal, ei.CoverMaterial, ei.Books, ei.Sheets, ei.Date, ei.BookThickness, ei.GroupID, ei.Remark, ei.Paper, ei.Alias, ei.Title, ei.Weight)
+		//print groups
+		for _, p := range o.PrintGroups {
+			pVals = append(pVals, "(?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			pArgs = append(pArgs, p.ID, p.OrderID, p.State, p.Width, p.Height, p.Paper, p.Frame, p.Correction, p.Cutting, p.Path, p.Alias, p.FileNum, p.BookType, p.BookPart, p.BookNum, p.SheetNum, p.IsPDF, p.IsDuplex, p.Prints, p.Butt)
+			//files
+			for _, f := range p.Files {
+				fVals = append(fVals, "(print_group, file_name, prt_qty, book_num, page_num, caption, book_part)")
+				fArgs = append(fArgs, f.PrintGroupID, f.FileName, f.PrintQtty, f.Book, f.Page, f.Caption, f.BookPart)
+			}
+		}
+	}
+
+	oSQL = oSQL + strings.Join(oVals, ",")
+	pSQL = pSQL + strings.Join(pVals, ",")
+	fSQL = fSQL + strings.Join(fVals, ",")
+
+	//run in transaction
+	t, err := b.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	_, err = t.Exec(oSQL, oArgs...)
+	if err != nil {
+		t.Rollback()
+		return err
+	}
+
+	_, err = t.Exec(xSQL, xArgs...)
+	if err != nil {
+		t.Rollback()
+		return err
+	}
+	_, err = t.Exec(pSQL, pArgs...)
+	if err != nil {
+		t.Rollback()
+		return err
+	}
+	_, err = t.Exec(fSQL, fArgs...)
+	if err != nil {
+		t.Rollback()
+		return err
+	}
+
+	return t.Commit()
+}
+
 func (b *basicRepository) ClearGroup(ctx context.Context, group int, keepID string) error {
 	sql := "DELETE FROM orders WHERE group_id = ? AND ID != ?"
 	_, err := b.db.ExecContext(ctx, sql, group, keepID)

@@ -81,7 +81,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 				Cutting: 20,
 				Frame:   15,
 				Path:    fmt.Sprintf("%d_%dx%d-%d-b", len(order.PrintGroups)+1, width, height, paper),
-				State:   pc.StateLoadComplite,
+				State:   order.State,
 			}
 		} else {
 			//photos without border
@@ -94,7 +94,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 				Cutting: 19,
 				Frame:   0,
 				Path:    fmt.Sprintf("%d_%dx%d-%d", len(order.PrintGroups)+1, width, height, paper),
-				State:   pc.StateLoadComplite,
+				State:   order.State,
 			}
 		}
 		//copy to cycle print folder
@@ -105,6 +105,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 		if done > 0 {
 			order.FotosNum = order.FotosNum + done
 			pg.FileNum = done
+			pg.Prints = done
 			pg.Files = make([]pc.PrintGroupFile, 0, done)
 			for _, fi := range list {
 				if fi.Process {

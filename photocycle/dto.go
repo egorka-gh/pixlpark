@@ -19,6 +19,7 @@ type Repository interface {
 	GetGroupState(ctx context.Context, baseID string, group int) (GroupState, error)
 	LoadBaseOrderByState(ctx context.Context, source, state int) (Order, error)
 	LoadBaseOrderByChildState(ctx context.Context, source, baseState, childState int) ([]Order, error)
+	FillOrders(ctx context.Context, orders []Order) error
 	Close()
 }
 
@@ -83,25 +84,27 @@ type OrderExtraInfo struct {
 
 //PrintGroup represents the PrintGroup of db object
 type PrintGroup struct {
-	ID        string    `json:"id" db:"id"`
-	OrderID   string    `json:"order_id" db:"order_id"`
-	State     int       `json:"state" db:"state"`
-	StateDate time.Time `json:"state_date" db:"state_date"`
-	Width     int       `json:"width" db:"width"`
-	Height    int       `json:"height" db:"height"`
-	Paper     int       `json:"paper" db:"paper"`
-	Frame     int       `json:"frame" db:"frame"`
-	Cutting   int       `json:"cutting" db:"cutting"`
-	Path      string    `json:"path" db:"path"`
-	Alias     string    `json:"alias" db:"alias"`
-	FileNum   int       `json:"file_num" db:"file_num"`
-	BookType  int       `json:"book_type" db:"book_type"`
-	BookPart  int       `json:"book_part" db:"book_part"`
-	BookNum   int       `json:"book_num" db:"book_num"`
-	SheetNum  int       `json:"sheet_num" db:"sheet_num"`
-	IsPDF     bool      `json:"is_pdf" db:"is_pdf"`
-	IsDuplex  bool      `json:"is_duplex" db:"is_duplex"`
-	Butt      int       `json:"butt" db:"butt"`
+	ID         string    `json:"id" db:"id"`
+	OrderID    string    `json:"order_id" db:"order_id"`
+	State      int       `json:"state" db:"state"`
+	StateDate  time.Time `json:"state_date" db:"state_date"`
+	Width      int       `json:"width" db:"width"`
+	Height     int       `json:"height" db:"height"`
+	Paper      int       `json:"paper" db:"paper"`
+	Frame      int       `json:"frame" db:"frame"`
+	Correction int       `json:"correction" db:"correction"`
+	Cutting    int       `json:"cutting" db:"cutting"`
+	Path       string    `json:"path" db:"path"`
+	Alias      string    `json:"alias" db:"alias"`
+	FileNum    int       `json:"file_num" db:"file_num"`
+	BookType   int       `json:"book_type" db:"book_type"`
+	BookPart   int       `json:"book_part" db:"book_part"`
+	BookNum    int       `json:"book_num" db:"book_num"`
+	SheetNum   int       `json:"sheet_num" db:"sheet_num"`
+	IsPDF      bool      `json:"is_pdf" db:"is_pdf"`
+	IsDuplex   bool      `json:"is_duplex" db:"is_duplex"`
+	Prints     int       `json:"prints" db:"prints"`
+	Butt       int       `json:"butt" db:"butt"`
 
 	//4 internal use
 	Files []PrintGroupFile

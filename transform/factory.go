@@ -605,9 +605,13 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		co.SourceID = fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID)
 
 		//try build by alias
+		//intermediate state for buld by alias (then forward to StatePreprocessWaite)
+		co.State = pc.StateLoadComplite
 		err = fc.transformAlias(t.ctx, item, &co)
 		if _, ok := err.(ErrCantTransform); ok == true {
 			//try build photo print
+			//intermediate state for buld photo (then forward to StatePrintWaite)
+			co.State = pc.StatePreprocessComplite
 			err = fc.transformPhoto(t.ctx, item, &co)
 		}
 		if err != nil {
@@ -632,7 +636,6 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		} else {
 			//item processed, add order
 			co.ExtraInfo = buildExtraInfo(co, item)
-			co.State = pc.StateLoadComplite
 			orders = append(orders, co)
 		}
 	}
@@ -652,15 +655,12 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
 			return fc.closeTransform
 		}
-		//create sub orders in  pc.StateConfirmation
-		for _, co := range orders {
-			err = fc.pcClient.CreateOrder(t.ctx, co)
-			if err != nil {
-				t.err = ErrRepository{err}
-				_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
-				return fc.closeTransform
-			}
-			_ = fc.pcClient.AddExtraInfo(t.ctx, co.ExtraInfo)
+		//create sub orders
+		err = fc.pcClient.FillOrders(t.ctx, orders)
+		if err != nil {
+			t.err = ErrRepository{err}
+			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
+			return fc.closeTransform
 		}
 
 		//finalase
@@ -763,6 +763,8 @@ func (fc *baseFactory) finish(t *Transform, restarted bool) error {
 			return err
 		}
 	}
+
+	//TODO refactor to sql procedure call (pp_StartOrders)
 	//move all cycle orders to state waite preprocess to start in cycle
 	err = fc.pcClient.SetGroupState(t.ctx, pc.StatePreprocessWaite, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
 	if err != nil {

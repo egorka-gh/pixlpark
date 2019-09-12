@@ -104,7 +104,8 @@ const (
 	//StatePreprocessIncomplite represent photocycle state
 	StatePreprocessIncomplite = 170 //Ошибка подготовки
 
-	//180	Подготовка завершена
+	//StatePreprocessComplite represent photocycle state
+	StatePreprocessComplite = 180 //Подготовка завершена
 
 	//StateConfirmation represent photocycle state
 	StateConfirmation = 199 //Ожидание подтверждения заказа

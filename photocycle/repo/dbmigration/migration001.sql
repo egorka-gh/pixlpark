@@ -18,3 +18,38 @@ SELECT AT.id, AT.name, AT.field, av.id avid, av.value, s.synonym
   WHERE AT.id IN (11, 12)
   ORDER BY s.synonym, AT.id
 */
+
+
+DELIMITER $$
+
+CREATE 
+PROCEDURE pp_StartOrders (IN pSourse int, IN pGroupId int, IN pExcludeId varchar(50))
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+  END;
+
+  START TRANSACTION;
+    -- book and other (all by alias)
+    -- StateLoadComplite -> StatePreprocessWaite
+    UPDATE orders o
+      SET o.state = 150
+      WHERE o.source = pSourse AND o.group_id = pGroupId AND o.id != pExcludeId AND o.state = 130;
+
+    -- photo print StatePreprocessComplite -> StatePrintWaite
+    -- print groups
+    UPDATE print_group pg
+    INNER JOIN orders o
+      ON o.id = pg.order_id
+      SET pg.state = 200
+      WHERE o.source = pSourse AND o.group_id = pGroupId AND o.id != pExcludeId AND o.state = 180;
+    -- orders
+    UPDATE orders o
+      SET o.state = 200
+      WHERE o.source = pSourse AND o.group_id = pGroupId AND o.id != pExcludeId AND o.state = 180;
+  COMMIT;
+END
+$$
+
+DELIMITER ;
