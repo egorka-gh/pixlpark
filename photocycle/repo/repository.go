@@ -80,13 +80,15 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 			pArgs = append(pArgs, p.ID, p.OrderID, p.State, p.Width, p.Height, p.Paper, p.Frame, p.Correction, p.Cutting, p.Path, p.Alias, p.FileNum, p.BookType, p.BookPart, p.BookNum, p.SheetNum, p.IsPDF, p.IsDuplex, p.Prints, p.Butt)
 			//files
 			for _, f := range p.Files {
-				fVals = append(fVals, "(print_group, file_name, prt_qty, book_num, page_num, caption, book_part)")
+				fVals = append(fVals, "(?, ?, ?, ?, ?, ?, ?)")
 				fArgs = append(fArgs, f.PrintGroupID, f.FileName, f.PrintQtty, f.Book, f.Page, f.Caption, f.BookPart)
 			}
 		}
 	}
 
 	oSQL = oSQL + strings.Join(oVals, ",")
+	xSQL = xSQL + strings.Join(xVals, ",")
+
 	pSQL = pSQL + strings.Join(pVals, ",")
 	fSQL = fSQL + strings.Join(fVals, ",")
 
@@ -106,15 +108,19 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 		t.Rollback()
 		return err
 	}
-	_, err = t.Exec(pSQL, pArgs...)
-	if err != nil {
-		t.Rollback()
-		return err
+	if len(pVals) > 0 {
+		_, err = t.Exec(pSQL, pArgs...)
+		if err != nil {
+			t.Rollback()
+			return err
+		}
 	}
-	_, err = t.Exec(fSQL, fArgs...)
-	if err != nil {
-		t.Rollback()
-		return err
+	if len(fVals) > 0 {
+		_, err = t.Exec(fSQL, fArgs...)
+		if err != nil {
+			t.Rollback()
+			return err
+		}
 	}
 
 	return t.Commit()

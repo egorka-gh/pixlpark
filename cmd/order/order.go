@@ -126,8 +126,8 @@ func readConfig() error {
 	viper.SetDefault("source.id", 23)                                                         //photocycle source id
 	viper.SetDefault("folders.zip", "D:\\Buffer\\pp\\wrk")                                    //work folder for loaded  and unpacked zips
 	viper.SetDefault("folders.in", "D:\\Buffer\\ftp\\in\\PXP")                                //cycle work folder (in ftp)
-	viper.SetDefault("folders.prn", "")                                                       //cycle print folder (out)
-	viper.SetDefault("folders.log", "")                                                       //Log folder
+	viper.SetDefault("folders.prn", "D:\\Buffer\\ftp\\out\\PXP")                              //cycle print folder (out)
+	viper.SetDefault("folders.log", ".\\log")                                                 //Log folder
 	viper.SetDefault("pixelpark.user", "photo.cycle@yandex.by")                               //pixelpark user email to post messages to api
 	viper.SetDefault("pixelpark.oauth.PublicKey", "aac2028cc33c4970b9e1a829ca7acd7b")         //oauth PublicKey
 	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey

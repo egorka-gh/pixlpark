@@ -629,6 +629,9 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 				return fc.closeTransform
 			}
 			msg = fmt.Sprintf("Элемент заказа %s '%s' не обработан. Ошибка %s", co.SourceID, item.Name, err.Error())
+			if fc.Debug {
+				fmt.Printf(msg)
+			}
 			//just log error
 			fc.log("error", msg)
 			fc.setPixelState(t, "", msg)
@@ -764,9 +767,8 @@ func (fc *baseFactory) finish(t *Transform, restarted bool) error {
 		}
 	}
 
-	//TODO refactor to sql procedure call (pp_StartOrders)
-	//move all cycle orders to state waite preprocess to start in cycle
-	err = fc.pcClient.SetGroupState(t.ctx, fc.source, pc.StatePreprocessWaite, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
+	//start orders in cycle
+	err = fc.pcClient.StartOrders(t.ctx, fc.source, t.pcBaseOrder.GroupID, t.pcBaseOrder.ID)
 	if err != nil {
 		t.err = ErrRepository{err}
 		fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -64,6 +63,12 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 	//copy & create order printgroup(s)/printgroupfiles
 	order.PrintGroups = make([]pc.PrintGroup, 0, 2)
 	outPath := path.Join(fc.cyclePrtFolder, order.FtpFolder)
+	//clear order print folder
+	err = recreateFolder(outPath)
+	if err != nil {
+		return ErrFileSystem{err}
+	}
+
 	lsts := [][]fileCopy{bList, nbList}
 	for i, list := range lsts {
 		if len(list) == 0 {
@@ -98,7 +103,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 			}
 		}
 		//copy to cycle print folder
-		done, err := listCopy(ctx, list, path.Join(outPath, pg.Path))
+		done, err := listCopy(ctx, list, path.Join(outPath, pg.Path, "print"))
 		if err != nil {
 			return err
 		}
@@ -188,8 +193,8 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 	}
 	//copy to cycle wrk folder/orderid/alias
 	outPath := path.Join(fc.cycleFolder, order.FtpFolder)
-	//clear output folder
-	err = os.RemoveAll(outPath)
+	//clear order folder
+	err = recreateFolder(outPath)
 	if err != nil {
 		return ErrFileSystem{err}
 	}
