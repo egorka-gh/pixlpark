@@ -177,6 +177,16 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 	//TODO check item.PageCount, don't forget added sheet if books > 1
 	//toProcess == item.PageCount
 
+	//check butt if 0 set by sku
+	butt := item.Sizes.Thickness
+	if butt == 0 {
+		b, ok := item.Sku()["butt"]
+		if ok && b != "" {
+			if bf, err := strconv.ParseFloat(b, 64); err == nil {
+				butt = bf
+			}
+		}
+	}
 	//set output names
 	//decode filenames to cycle names '000-00.jpg'
 	//cover 000-00_309_5.jpg
@@ -185,7 +195,7 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 			//width & butt for cover
 			sufix := ""
 			if alias.HasCover == true && list[i].SheetIdx == 0 && item.Sizes.Width > 0 {
-				sufix = fmt.Sprintf("_%.0f_%.0f", math.Round(item.Sizes.Width), math.Round(item.Sizes.Thickness))
+				sufix = fmt.Sprintf("_%.0f_%.0f", math.Round(item.Sizes.Width), math.Round(butt))
 			}
 
 			list[i].NewName = fmt.Sprintf("%03d-%02d%s%s", list[i].BookIdx, list[i].SheetIdx, sufix, filepath.Ext(list[i].OldName))

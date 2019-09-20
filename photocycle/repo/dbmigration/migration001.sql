@@ -53,3 +53,5 @@ END
 $$
 
 DELIMITER ;
+
+--2019-09-13 applied on main cycle
