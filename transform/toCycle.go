@@ -261,16 +261,23 @@ func buildExtraInfo(forOrder pc.Order, from pp.OrderItem) pc.OrderExtraInfo {
 	}
 
 	return pc.OrderExtraInfo{
-		ID:      forOrder.ID,
-		GroupID: forOrder.GroupID,
-		Format:  from.Name,
-		Books:   from.Quantity,
-		Sheets:  sheets,
-		Alias:   from.Sku()["alias"],
-		Paper:   from.Sku()["paper"],
-		Remark:  from.Comment,
-		Title:   from.Description,
-		Date:    forOrder.SourceDate,
+		ID:         forOrder.ID,
+		GroupID:    forOrder.GroupID,
+		Format:     from.Name,
+		Books:      from.Quantity,
+		Sheets:     sheets,
+		Alias:      from.Sku()["alias"],
+		Paper:      from.Sku()["paper"],
+		Remark:     from.Comment,
+		Title:      from.Description,
+		Date:       forOrder.SourceDate,
+		EndPaper:   from.Sku()["endpaper"],
+		InterLayer: from.Sku()["interlayer"],
+		Cover:      from.Sku()["cover"],
+		//Format:        from.Sku()["format"],
+		CornerType:    from.Sku()["corner_type"],
+		Kaptal:        from.Sku()["kaptal"],
+		CoverMaterial: from.Sku()["cover_material"],
 	}
 }
 
