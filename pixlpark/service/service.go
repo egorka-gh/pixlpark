@@ -78,6 +78,7 @@ type Order struct {
 	CustomID             string          `json:"CustomId"`
 	SourceOrderID        string          `json:"SourceOrderId"`
 	ManagerID            string          `json:"ManagerId"`
+	ProductionID            int          `json:"AssignedToId"`
 	Title                string          `json:"Title"`
 	TrackingURL          string          `json:"TrackingUrl"`
 	TrackingNumber       string          `json:"TrackingNumber"`

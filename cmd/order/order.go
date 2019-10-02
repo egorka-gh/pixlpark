@@ -69,7 +69,7 @@ func main() {
 		fmt.Printf("Ошибка подключения к базе данных %s\n", err.Error())
 		return
 	}
-	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
+	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetInt("production"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
 	fc.SetDebug(true)
 	//oid := "1874839**"
 	fmt.Printf("Страт заказа %s\n", oid)
@@ -124,6 +124,7 @@ func readConfig() error {
 
 	viper.SetDefault("mysql", "root:3411@tcp(127.0.0.1:3306)/fotocycle_cycle?parseTime=true") //MySQL connection string
 	viper.SetDefault("source.id", 23)                                                         //photocycle source id
+	viper.SetDefault("production", 0)                                                         //production id (0 - all orders)
 	viper.SetDefault("folders.zip", "D:\\Buffer\\pp\\wrk")                                    //work folder for loaded  and unpacked zips
 	viper.SetDefault("folders.in", "D:\\Buffer\\ftp\\in\\PXP")                                //cycle work folder (in ftp)
 	viper.SetDefault("folders.prn", "D:\\Buffer\\ftp\\out\\PXP")                              //cycle print folder (out)

@@ -41,6 +41,7 @@ type Factory interface {
 // Factory is factory of transform item (Transform)
 // creates transform item and defines transform process
 type baseFactory struct {
+	production     int
 	ppClient       pp.PPService
 	pcClient       pc.Repository
 	source         int
@@ -99,8 +100,9 @@ var (
 )
 
 // NewFactory returns a new transform Factory, using provided configuration.
-func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse int, workFolder, cycleFolder, cyclePrtFolder, pixlparkUserEmail string, logger log.Logger) Factory {
+func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse, production int, workFolder, cycleFolder, cyclePrtFolder, pixlparkUserEmail string, logger log.Logger) Factory {
 	return &baseFactory{
+		production:     production,
 		ppClient:       pixlparkClient,
 		pcClient:       photocycleClient,
 		source:         sourse,
