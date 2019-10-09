@@ -1,3 +1,6 @@
+/*
+Package service is client for http://api.pixlpark.com/
+*/
 package service
 
 import (
@@ -78,7 +81,7 @@ type Order struct {
 	CustomID             string          `json:"CustomId"`
 	SourceOrderID        string          `json:"SourceOrderId"`
 	ManagerID            string          `json:"ManagerId"`
-	ProductionID            int          `json:"AssignedToId"`
+	ProductionID         int             `json:"AssignedToId"`
 	Title                string          `json:"Title"`
 	TrackingURL          string          `json:"TrackingUrl"`
 	TrackingNumber       string          `json:"TrackingNumber"`

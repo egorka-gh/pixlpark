@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 	"time"
 
 	log "github.com/go-kit/kit/log"
@@ -51,6 +52,11 @@ type baseFactory struct {
 	ppUser         string
 	logger         log.Logger
 	Debug          bool
+
+	//current queues
+	mu     sync.Mutex            // guards queues map
+	queues map[string][]pp.Order // PP state -> orders slice
+
 }
 
 //internal errors, factory has to make decision what to do (rise error or proceed transform)
@@ -321,6 +327,41 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 		t.err = ErrEmptyQueue{fmt.Errorf("No orders in state %s", t.fetchState)}
 	}
 	return fc.closeTransform
+}
+
+func (fc *baseFactory) queuePop(ctx context.Context, state string) (pp.Order, error) {
+	var order pp.Order
+	var err error
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	//get queue slice
+	queue := fc.queues[state]
+	if queue == nil {
+		//get orders count by state
+		cnt := 0
+		cnt, err = fc.ppClient.CountOrders(ctx, []string{state})
+		if err != nil {
+			return order, ErrService{err}
+		}
+		if cnt == 0 {
+			return order, ErrEmptyQueue{fmt.Errorf("No orders in state %s", state)}
+		}
+		//get all orders
+		queue, err = fc.ppClient.GetOrders(ctx, state, 0, 0, cnt, 0)
+		if err != nil {
+			return order, ErrService{err}
+		}
+	}
+	//check if empty
+	if len(queue) == 0 {
+		fc.queues[state] = nil
+		return order, ErrEmptyQueue{fmt.Errorf("No orders in state %s", state)}
+	}
+	//pop last (first by date, GetOrders returns orders sorted by date DESC)
+	order = queue[len(queue)-1]
+	fc.queues[state] = queue[:len(queue)-1]
+
+	return order, err
 }
 
 //fetchToTransform looks for in cycle orders whith not complited transform

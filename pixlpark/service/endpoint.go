@@ -54,15 +54,6 @@ func (b basePPResponse) check() error {
 	return nil
 }
 
-/*
-func (b basePPResponse) checkAPIVersion() error {
-	if b.APIVersion != APIVersion {
-		return fmt.Errorf("Wrong API version. Expected %s. Got %s", APIVersion, b.APIVersion)
-	}
-	return nil
-}
-*/
-
 //*************** CountOrders
 
 // CountOrdersRequest collects the request parameters for the CountOrders method.
