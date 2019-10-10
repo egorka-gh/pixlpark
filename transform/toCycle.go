@@ -22,29 +22,30 @@ import (
 func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, order *pc.Order) error {
 	p, ok := item.Sku()["paper"]
 	if !ok || p == "" {
-		return ErrCantTransform{errors.New("Не указан алиас бумаги (paper)")}
+		return errCantTransform
+		//return ErrCantTransform{errors.New("Не указан алиас бумаги (paper)")}
 	}
 	paper, err := strconv.Atoi(p)
 	if err != nil || paper == 0 {
-		return ErrTransform{fmt.Errorf("Не верное значение алиаса бумаги (paper) %s", p)}
+		return ErrTransform{fmt.Errorf("Не верное значение sku бумаги (paper) %s", p)}
 	}
 
 	w, ok := item.Sku()["width"]
 	if !ok || w == "" {
-		return ErrCantTransform{errors.New("Не указан алиас ширины (width)")}
+		return ErrCantTransform{errors.New("Не указан sku ширины (width)")}
 	}
 	width, err := strconv.Atoi(w)
 	if err != nil || width == 0 {
-		return ErrTransform{fmt.Errorf("Не верное значение алиаса ширины (width) %s", w)}
+		return ErrTransform{fmt.Errorf("Не верное значение sku ширины (width) %s", w)}
 	}
 
 	h, ok := item.Sku()["height"]
 	if !ok || h == "" {
-		return ErrCantTransform{errors.New("Не указан алиас длины (height)")}
+		return ErrCantTransform{errors.New("Не указан sku длины (height)")}
 	}
 	height, err := strconv.Atoi(h)
 	if err != nil || height == 0 {
-		return ErrTransform{fmt.Errorf("Не верное значение алиаса длины (height) %s", h)}
+		return ErrTransform{fmt.Errorf("Не верное значение sku длины (height) %s", h)}
 	}
 
 	//check for photos base folder (copies_1)
@@ -114,7 +115,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 			pg.Files = make([]pc.PrintGroupFile, 0, done)
 			for _, fi := range list {
 				if fi.Process {
-					pg.Files = append(pg.Files, pc.PrintGroupFile{PrintGroupID: pg.ID, FileName: fi.NewName, Caption: fi.NewName, PrintQtty: 1})
+					pg.Files = append(pg.Files, pc.PrintGroupFile{PrintGroupID: pg.ID, FileName: path.Join("print", fi.NewName), Caption: fi.NewName, PrintQtty: 1})
 				}
 			}
 			order.PrintGroups = append(order.PrintGroups, pg)
