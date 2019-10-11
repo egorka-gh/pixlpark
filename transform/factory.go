@@ -151,7 +151,12 @@ func (fc *baseFactory) LoadNew(ctx context.Context) *Transform {
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
 	fc.run(t, fc.fetchToLoad)
 	if t.IsComplete() {
-		fc.log("LoadNew.Error", t.Err().Error())
+		if t.Err() != nil {
+			fc.log("LoadNew.Error", t.Err().Error())
+		} else {
+			//panic??
+			fc.log("LoadNew.Error", "complited fetch must return error")
+		}
 		return t
 	}
 	//Run load in a new goroutine
@@ -179,7 +184,12 @@ func (fc *baseFactory) LoadRestart(ctx context.Context) *Transform {
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
 	fc.run(t, fc.fetchToLoad)
 	if t.IsComplete() {
-		fc.log("LoadRestart.Error", t.Err().Error())
+		if t.Err() != nil {
+			fc.log("LoadRestart.Error", t.Err().Error())
+		} else {
+			//panic??
+			fc.log("LoadRestart.Error", "complited fetch must return error")
+		}
 		return t
 	}
 	//Run load in a new goroutine
@@ -289,28 +299,36 @@ func (fc *baseFactory) log(key, massage string) {
 //fetched order moves to statePixelLoadStarted in PP and to StateLoadWaite in cycle
 //must check order state in cycle (not implemented)
 func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
+	var err error
+	var inerErr error
+	var po pp.Order
 	fc.log("fetchState", t.fetchState)
-	//TODO scan all queue vs t.fetchState
-	orders, err := fc.ppClient.GetOrders(t.ctx, t.fetchState, 0, 0, 20, 0)
-	if err != nil {
-		t.err = ErrService{err}
-		return fc.closeTransform
-	}
 
-	for _, po := range orders {
+	for po, err = fc.queuePop(t.ctx, t.fetchState); err == nil; {
 		fc.log("fetch", po.ID)
+
 		co := fromPPOrder(po, fc.source, "@")
 		co.State = pc.StateLoadWaite
+
+		//check production
+		if fc.production > 0 && po.ProductionID != fc.production {
+			fc.log("fetch.skip.production", po.ID)
+			//log if it created ??
+			//fc.pcClient.LogState(t.ctx, co.ID, pc.StateErrProductionNotSet, "")
+			continue
+		}
+
 		//check states in cycle
-		ok, err := fc.checkCreateInCycle(t, co)
+		ok := false
+		ok, inerErr = fc.checkCreateInCycle(t, co)
 		if !ok {
 			continue
 		}
 		//move state in PP to statePixelLoadStarted
 		if t.fetchState != statePixelLoadStarted {
-			if err = fc.setPixelState(t, statePixelLoadStarted, ""); err != nil {
+			if inerErr = fc.setPixelState(t, statePixelLoadStarted, ""); inerErr != nil {
 				//keep fetching
-				err = ErrService{err}
+				inerErr = ErrService{inerErr}
 				continue
 			}
 		}
@@ -319,13 +337,13 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 		t.pcBaseOrder = co
 		return nil
 	}
-	if err != nil {
+
+	t.err = err
+	if err == nil {
 		//return last error
-		t.err = err
-	} else {
-		//empty queue
-		t.err = ErrEmptyQueue{fmt.Errorf("No orders in state %s", t.fetchState)}
+		t.err = inerErr
 	}
+
 	return fc.closeTransform
 }
 
