@@ -36,7 +36,7 @@ func (fc *baseFactory) DoOrder(ctx context.Context, id string) *Transform {
 	fc.run(t, fc.getOrder)
 
 	if t.IsComplete() {
-		fc.log("DoOrder Error", t.Err().Error())
+		fc.logger.Log("DoOrder Error", t.Err().Error())
 		return t
 	}
 	//Run load in a new goroutine
@@ -63,7 +63,7 @@ func (fc *baseFactory) ResetStarted(ctx context.Context) *Transform {
 	if !t.IsComplete() {
 		panic("transform: developer error: resetFetched must return completed transform")
 	}
-	fc.log("ResetStarted", t.Err().Error())
+	fc.logger.Log("ResetStarted", t.Err().Error())
 	return nil
 }
 
@@ -72,7 +72,7 @@ func (fc *baseFactory) ResetStarted(ctx context.Context) *Transform {
 //on success t is not closed (valid for processing)
 //TODO 4 production add states check
 func (fc *baseFactory) getOrder(t *Transform) stateFunc {
-	fc.log("getOrder", t.ppOrder.ID)
+	fc.logger.Log("getOrder", t.ppOrder.ID)
 	if !fc.Debug {
 		t.err = errors.New("DoOrder can be used only in debug mode")
 		return fc.closeTransform
@@ -120,7 +120,7 @@ func (fc *baseFactory) resetFetched(t *Transform) stateFunc {
 		}
 		doFetch = len(orders) > 0
 		for _, po := range orders {
-			fc.log("resetFetched", po.ID)
+			fc.logger.Log("resetFetched", po.ID)
 			co := fromPPOrder(po, fc.source, "@")
 
 			//TODO load/check state from all orders by group?
