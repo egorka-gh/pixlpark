@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	clog "log"
 	"os"
 	"path"
-	"time"
 
+	cycle "github.com/egorka-gh/pixlpark/photocycle"
 	"github.com/egorka-gh/pixlpark/photocycle/repo"
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/pixlpark/service"
@@ -14,36 +16,139 @@ import (
 	log "github.com/go-kit/kit/log"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/kardianos/osext"
+	service1 "github.com/kardianos/service"
+	group "github.com/oklog/oklog/pkg/group"
+
 	"github.com/spf13/viper"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
+//demon logger
+var dLogger service1.Logger
+
+//
+type program struct {
+	group     *group.Group
+	rep       cycle.Repository
+	interrupt chan struct{}
+	quit      chan struct{}
+}
+
+//start os demon or console using kardianos
 func main() {
-
-	var oid string
-	if len(os.Args) > 1 {
-		oid = os.Args[1]
-	}
-	if oid == "" {
-		fmt.Println("Не указан номер заказа")
+	err := readConfig()
+	if err != nil {
+		clog.Fatal(err)
 		return
-
 	}
 
-	if err := readConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			// Config file not found; ignore error if desired
-			fmt.Println("Start using default setings")
-		} else {
-			fmt.Println(err.Error())
-			return
+	var instanseID = viper.GetString("source.id")
+	svcConfig := &service1.Config{
+		Name:        "Pixel_" + instanseID,
+		DisplayName: "Pixel Service id:" + instanseID,
+		Description: "Pixel sub service for PhotoCycle",
+	}
+	prg := &program{}
+
+	s, err := service1.New(prg, svcConfig)
+	if err != nil {
+		clog.Fatal(err)
+		return
+	}
+	if len(os.Args) > 1 {
+		err = service1.Control(s, os.Args[1])
+		if err != nil {
+			clog.Fatal(err)
 		}
+		return
 	}
+	dLogger, err = s.Logger(nil)
+	if err != nil {
+		clog.Fatal(err)
+	}
+	err = s.Run()
+	if err != nil {
+		dLogger.Error(err)
+	}
+
+}
+
+func (p *program) Start(s service1.Service) error {
+	g, rep, err := initPixel()
+	if err != nil {
+		return err
+	}
+	p.group = g
+	p.rep = rep
+	p.interrupt = make(chan struct{})
+	p.quit = make(chan struct{})
+
+	if service1.Interactive() {
+		dLogger.Info("Running in terminal.")
+		dLogger.Infof("Valid startup parametrs: %q\n", service1.ControlAction)
+	} else {
+		dLogger.Info("Starting Pixel service...")
+	}
+	// Start should not block. Do the actual work async.
+	go p.run()
+	return nil
+}
+
+func (p *program) run() {
+	//close db cnn
+	defer p.rep.Close()
+	running := make(chan struct{})
+	//initCancelInterrupt
+	p.group.Add(
+		func() error {
+			select {
+			case <-p.interrupt:
+				return errors.New("Pixel: Get interrupt signal")
+			case <-running:
+				return nil
+			}
+		}, func(error) {
+			close(running)
+		})
+	dLogger.Info("Pixel started")
+	dLogger.Info(p.group.Run())
+	close(p.quit)
+}
+
+func (p *program) Stop(s service1.Service) error {
+	// Stop should not block. Return with a few seconds.
+	dLogger.Info("Pixel Stopping!")
+	//interrupt service
+	close(p.interrupt)
+	//waite service stops
+	<-p.quit
+	dLogger.Info("Pixel stopped")
+	return nil
+}
+
+func initPixel() (*group.Group, cycle.Repository, error) {
+
+	/*
+		if err := readConfig(); err != nil {
+			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+				// Config file not found; ignore error if desired
+				fmt.Println("Start using default setings")
+			} else {
+				fmt.Println(err.Error())
+				return
+			}
+		}
+	*/
 
 	//TODO check settings
 	if viper.GetInt("source.id") == 0 {
-		fmt.Println("Не задано ID источника")
-		return
+		return nil, nil, errors.New("Не задано ID источника")
+	}
+	if viper.GetString("pixelpark.oauth.PublicKey") == "" || viper.GetString("pixelpark.oauth.PrivateKey") == "" {
+		return nil, nil, errors.New("Не заданы параметры oauth")
+	}
+	if viper.GetString("mysql") == "" {
+		return nil, nil, errors.New("Не задано подключение mysql")
 	}
 
 	logger := initLoger(viper.GetString("folders.log"), "pixel")
@@ -61,43 +166,36 @@ func main() {
 
 	url := "http://api.pixlpark.com"
 	oauthClient := cnf.Client(context.Background(), nil)
-	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(log.With(logger, "level", "transport")))
+	ppClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(log.With(logger, "level", "transport")))
 
 	//create repro
 	rep, err := repo.New(viper.GetString("mysql"))
 	if err != nil {
 		logger.Log("Open database error", err.Error())
-		fmt.Printf("Ошибка подключения к базе данных %s\n", err.Error())
-		return
+		return nil, nil, fmt.Errorf("Ошибка подключения к базе данных %s", err.Error())
 	}
+
+	//TODO log startup params
+
 	//create factory
-	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
+	fc := transform.NewFactory(ppClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
 
-	//TODO create manager
-	//TODO start that
+	//TODO for test
+	fc.SetDebug(true)
 
-	fmt.Printf("Страт заказа %s\n", oid)
-	transf := fc.DoOrder(context.Background(), oid)
+	//create manager
+	mn := transform.NewManager(fc, viper.GetInt("threads"), viper.GetInt("interval"), logger)
+	g := &group.Group{}
 
-	t := time.NewTicker(3 * time.Second)
-Loop:
-	for {
-		select {
-		case <-t.C:
-			fmt.Printf("Скорость загрузки %.2fmb/s\n", transf.BytesPerSecond()/(1024*1024))
-		case <-transf.Done:
-			// download is complete
-			break Loop
-		}
-	}
-	t.Stop()
-	err = transf.Err()
-	if err != nil {
-		logger.Log("TransformError", err.Error())
-		fmt.Printf("Ошибка обработки заказа %s\n", err.Error())
-	} else {
-		fmt.Printf("Заказ обработан, cycle id %s\n", transf.CycleID())
-	}
+	g.Add(func() error {
+		mn.Start()
+		mn.Wait()
+		return nil
+	}, func(error) {
+		mn.Quit()
+	})
+
+	return g, rep, nil
 }
 
 func initLoger(logPath, fileName string) log.Logger {

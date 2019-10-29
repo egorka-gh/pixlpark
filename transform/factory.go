@@ -117,6 +117,7 @@ func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sou
 		cyclePrtFolder: cyclePrtFolder,
 		ppUser:         pixlparkUserEmail,
 		logger:         logger,
+		queues:         make(map[string][]pp.Order),
 	}
 }
 

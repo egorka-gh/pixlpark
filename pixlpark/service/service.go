@@ -99,7 +99,7 @@ type Order struct {
 	TotalPrice           float64         `json:"TotalPrice"`
 	PaidPrice            float64         `json:"PaidPrice"`
 	UserID               int             `json:"UserId"`
-	UserCompanyAccountID string          `json:"UserCompanyAccountId"`
+	UserCompanyAccountID int             `json:"UserCompanyAccountId"`
 	DiscountID           int             `json:"DiscountId"` //?? no in response
 	DiscountTitle        string          `json:"DiscountTitle"`
 	DateCreated          Date            `json:"DateCreated,string"`
