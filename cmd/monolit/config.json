@@ -4,7 +4,7 @@
     "production.pixel": 0,
     "production.cycle": 0,
     "interval": 5,
-    "threads": 3,
+    "threads": 2,
     "folders.zip": "D:\\Buffer\\pp\\wrk",
     "folders.in": "D:\\Buffer\\ftp\\in\\PXP",
     "folders.prn": "D:\\Buffer\\ftp\\out\\PXP",

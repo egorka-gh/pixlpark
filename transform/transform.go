@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cavaliercoder/grab"
+	log "github.com/go-kit/kit/log"
 
 	pc "github.com/egorka-gh/pixlpark/photocycle"
 	pp "github.com/egorka-gh/pixlpark/pixlpark/service"
@@ -46,6 +47,9 @@ type Transform struct {
 
 	// loader grab loader
 	loader *grab.Response
+
+	//contextual logger
+	logger log.Logger
 
 	// Error contains any error that may have occurred during the file transfer.
 	// This should not be read until IsComplete returns true.

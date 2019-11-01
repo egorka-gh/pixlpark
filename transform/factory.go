@@ -150,16 +150,19 @@ func (fc *baseFactory) LoadNew(ctx context.Context) *Transform {
 		Done:       make(chan struct{}, 0),
 		ctx:        ctx,
 		cancel:     cancel,
+		logger:     log.With(fc.logger, "sequence", "LoadNew"),
 	}
+
+	t.logger.Log("event", "start")
 
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
 	fc.run(t, fc.fetchToLoad)
 	if t.IsComplete() {
 		if t.Err() != nil {
-			fc.logger.Log("LoadNew.Error", t.Err().Error())
+			t.logger.Log("event", "end", "error", t.Err().Error())
 		} else {
 			//panic??
-			fc.logger.Log("LoadNew.Error", "complited fetch must return error")
+			t.logger.Log("event", "end", "error", "complited fetch must return error")
 		}
 		return t
 	}
@@ -183,16 +186,18 @@ func (fc *baseFactory) LoadRestart(ctx context.Context) *Transform {
 		Done:       make(chan struct{}, 0),
 		ctx:        ctx,
 		cancel:     cancel,
+		logger:     log.With(fc.logger, "sequence", "LoadRestart"),
 	}
 
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
+	t.logger.Log("event", "start")
 	fc.run(t, fc.fetchToLoad)
 	if t.IsComplete() {
 		if t.Err() != nil {
-			fc.logger.Log("LoadRestart.Error", t.Err().Error())
+			t.logger.Log("event", "end", "error", t.Err().Error())
 		} else {
 			//panic??
-			fc.logger.Log("LoadRestart.Error", "complited fetch must return error")
+			t.logger.Log("event", "end", "error", "complited fetch must return error")
 		}
 		return t
 	}
@@ -216,12 +221,14 @@ func (fc *baseFactory) TransformRestart(ctx context.Context) *Transform {
 		Done:       make(chan struct{}, 0),
 		ctx:        ctx,
 		cancel:     cancel,
+		logger:     log.With(fc.logger, "sequence", "TransformRestart"),
 	}
 
+	t.logger.Log("event", "start")
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
 	fc.run(t, fc.fetchToTransform)
 	if t.IsComplete() {
-		fc.logger.Log("TransformRestart.Error", t.Err().Error())
+		t.logger.Log("event", "end", "error", t.Err().Error())
 		return t
 	}
 	//Run transform in a new goroutine
@@ -246,18 +253,20 @@ func (fc *baseFactory) FinalizeRestart(ctx context.Context) *Transform {
 		Done:       make(chan struct{}, 0),
 		ctx:        ctx,
 		cancel:     cancel,
+		logger:     log.With(fc.logger, "sequence", "FinalizeRestart"),
 	}
 
 	// get and forward all
+	t.logger.Log("event", "start")
 	fc.run(t, fc.doFinalize)
 	if t.IsComplete() {
 		//complited
-		fc.logger.Log("FinalizeRestart.Error", t.Err().Error())
+		t.logger.Log("event", "end", "error", t.Err().Error())
 		return t
 	}
 
 	//must never happend
-	fc.logger.Log("FinalizeRestart.Error", "Got incompleted transform")
+	t.logger.Log("event", "end", "error", "Got incompleted transform")
 	fc.run(t, fc.closeTransform)
 	return t
 }
@@ -300,10 +309,10 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 	var err error
 	var inerErr error
 	var po pp.Order
-	fc.logger.Log("fetchState", t.fetchState)
+	t.logger.Log("fetchState", t.fetchState)
 
 	for po, err = fc.queuePop(t.ctx, t.fetchState); err == nil; {
-		logger := log.With(fc.logger, "order", po.ID)
+		logger := log.With(t.logger, "order", po.ID)
 		logger.Log("fetch", "start")
 
 		co := fromPPOrder(po, fc.source, "@")
@@ -336,6 +345,8 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 		//сan load stop fetching
 		t.ppOrder = po
 		t.pcBaseOrder = co
+		//next t logs will go vs order id
+		t.logger = logger
 		logger.Log("fetch", "complite")
 		return nil
 	}
@@ -401,10 +412,14 @@ func (fc *baseFactory) fetchToTransform(t *Transform) stateFunc {
 		}
 		return fc.closeTransform
 	}
+	logger := log.With(t.logger, "order", t.pcBaseOrder.GroupID)
+	logger.Log("event", "start")
+
 	//load from PP
 	t.ppOrder, err = fc.ppClient.GetOrder(t.ctx, t.pcBaseOrder.SourceID)
 	if err != nil {
 		t.err = ErrService{err}
+		logger.Log("error", err.Error())
 		return fc.closeTransform
 	}
 	//check PP state
@@ -415,6 +430,7 @@ func (fc *baseFactory) fetchToTransform(t *Transform) stateFunc {
 		err = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
 		if err != nil {
 			t.err = ErrRepository{err}
+			logger.Log("error", err.Error())
 			return fc.closeTransform
 		}
 		// try next one
@@ -422,6 +438,8 @@ func (fc *baseFactory) fetchToTransform(t *Transform) stateFunc {
 	}
 
 	//fetched
+	t.logger = logger
+	logger.Log("event", "end")
 	return nil
 }
 
@@ -440,16 +458,21 @@ func (fc *baseFactory) doFinalize(t *Transform) stateFunc {
 		}
 		return fc.closeTransform
 	}
+	//TODO continue on error?
 	for _, t.pcBaseOrder = range orders {
 		//check context canceled
 		if t.ctx.Err() != nil {
 			t.err = t.ctx.Err()
 			return fc.closeTransform
 		}
+		logger := log.With(t.logger, "order", t.pcBaseOrder.GroupID)
+		logger.Log("event", "start")
+
 		//load from PP
 		t.ppOrder, err = fc.ppClient.GetOrder(t.ctx, t.pcBaseOrder.SourceID)
 		if err != nil {
 			t.err = ErrService{err}
+			logger.Log("error", err.Error())
 			return fc.closeTransform
 		}
 		//check PP state
@@ -460,26 +483,29 @@ func (fc *baseFactory) doFinalize(t *Transform) stateFunc {
 			err = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
 			if err != nil {
 				t.err = ErrRepository{err}
+				logger.Log("error", err.Error())
 				return fc.closeTransform
 			}
 		}
 		//finalize
 		err = fc.finish(t, true)
 		if err != nil {
+			logger.Log("error", err.Error())
 			return fc.closeTransform
 		}
+		logger.Log("event", "end")
 	}
 
 	//complited
-	t.err = ErrEmptyQueue{fmt.Errorf("Complite")}
+	t.err = ErrEmptyQueue{fmt.Errorf("No orders in cycle with appropriate states")}
 	return fc.closeTransform
 }
 
 //start grab client to load zip
 //in/out states statePixelLoadStarted in PP and StateLoadWaite in cycle
 func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
-	logger := log.With(fc.logger, "order", t.ppOrder.ID)
-	logger.Log("loadZIP", "start")
+	logger := log.With(t.logger, "stage", "loadZIP")
+	logger.Log("event", "start")
 
 	loader := grab.NewClient()
 	fl := filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip")
@@ -522,7 +548,7 @@ func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrWeb, t.err.Error())
 		return fc.closeTransform
 	}
-	logger.Log("loadZIP", "complite")
+	logger.Log("event", "end")
 	//don't change cycle state just log
 	_ = fc.setCycleState(t, 0, pc.StateLoadComplite, fmt.Sprintf("zip loaded elapsed=%s; speed=%.2f mb/s", t.loader.Duration().String(), t.loader.BytesPerSecond()/(1024*1024)))
 	//still in LoadWaie in cycle
@@ -536,8 +562,8 @@ func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
 func (fc *baseFactory) unzip(t *Transform) stateFunc {
 	//TODO err limiter??
 	started := time.Now()
-	logger := log.With(fc.logger, "order", t.ppOrder.ID)
-	logger.Log("unzip", "start")
+	logger := log.With(t.logger, "stage", "unzip")
+	logger.Log("event", "start")
 	_ = fc.setCycleState(t, 0, pc.StateUnzip, "start")
 
 	reader, err := zip.OpenReader(filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip"))
@@ -624,7 +650,7 @@ func (fc *baseFactory) unzip(t *Transform) stateFunc {
 
 	//move to StateUnzip in cycle (to resume from transform)
 	_ = fc.setCycleState(t, pc.StateUnzip, pc.StateUnzip, fmt.Sprintf("complete elapsed=%s", time.Since(started).String()))
-	logger.Log("unzip", "complete")
+	logger.Log("event", "end")
 	//forvard to transform
 	return fc.transformItems
 }
@@ -647,8 +673,8 @@ func (fc *baseFactory) unzip(t *Transform) stateFunc {
 //		pp - StatePrinting; cycle - base: StateUnzip; orders: StateLoadComplite
 func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 	var err error
-	logger := log.With(fc.logger, "order", t.ppOrder.ID)
-	logger.Log("transform", "start")
+	logger := log.With(t.logger, "stage", "transform")
+	logger.Log("event", "start")
 	_ = fc.setCycleState(t, 0, pc.StateTransform, "start")
 
 	items, err := fc.ppClient.GetOrderItems(t.ctx, t.ppOrder.ID)
@@ -662,6 +688,7 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 
 	if len(items) == 0 {
 		t.err = ErrTransform{errors.New("Order has no items")}
+		logger.Log("error", t.err.Error())
 		fc.setPixelState(t, statePixelAbort, "Пустой заказ")
 		fc.setCycleState(t, pc.StateSkiped, pc.StateErrWeb, "Пустой заказ")
 		if fc.Debug {
@@ -735,6 +762,7 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		if err != nil {
 			t.err = ErrRepository{err}
 			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
+			logger.Log("error", err.Error())
 			return fc.closeTransform
 		}
 		//create sub orders
@@ -742,9 +770,10 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		if err != nil {
 			t.err = ErrRepository{err}
 			_ = fc.setCycleState(t, pc.StateUnzip, pc.StateErrWrite, err.Error())
+			logger.Log("error", err.Error())
 			return fc.closeTransform
 		}
-		logger.Log("transform", "complite")
+		logger.Log("event", "end")
 		//finalase
 		fc.finish(t, false)
 	}
@@ -834,8 +863,13 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 }
 
 //finalize complete transform
-func (fc *baseFactory) finish(t *Transform, restarted bool) error {
-	var err error
+func (fc *baseFactory) finish(t *Transform, restarted bool) (err error) {
+	defer func() {
+		if err != nil {
+			t.logger.Log("stage", "finish", "error", err.Error())
+		}
+	}()
+
 	if restarted == false && fc.Debug == false {
 		//set state in pp
 		err = fc.ppClient.SetOrderStatus(t.ctx, t.ppOrder.ID, pp.StatePrinting, true)
