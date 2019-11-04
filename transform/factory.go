@@ -26,6 +26,8 @@ type Factory interface {
 	// LoadNew main sequence
 	// fetch new order and perfom full trunsform
 	LoadNew(ctx context.Context) *Transform
+	//SoftErrorRestart restarts orders after confirmed soft error
+	SoftErrorRestart(ctx context.Context) *Transform
 	//LoadRestart reload orders that allready started (statePixelLoadStarted)
 	LoadRestart(ctx context.Context) *Transform
 	//TransformRestart restart incompleted transforms
@@ -203,6 +205,44 @@ func (fc *baseFactory) LoadRestart(ctx context.Context) *Transform {
 	}
 	//Run load in a new goroutine
 	go fc.run(t, fc.loadZIP)
+	return t
+}
+
+//SoftErrorRestart reload orders in state statePixelWaiteConfirm
+// orders that allready started and has some reparable error (now orders that not transformed - unknown product)
+// behavior same as LoadNew exepct fetch orders in state statePixelWaiteConfirm
+// resumes processing from transformItems
+// get ordrers vs statePixelWaiteConfirm in PP, expected state in cycle StateUnzip (expect but not check)
+func (fc *baseFactory) SoftErrorRestart(ctx context.Context) *Transform {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	t := &Transform{
+		fetchState: statePixelWaiteConfirm,
+		Start:      time.Now(),
+		Done:       make(chan struct{}, 0),
+		ctx:        ctx,
+		cancel:     cancel,
+		logger:     log.With(fc.logger, "sequence", "SoftErrorRestart"),
+	}
+
+	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
+	t.logger.Log("event", "start")
+	fc.run(t, fc.fetchToLoad)
+	if t.IsComplete() {
+		if t.Err() != nil {
+			t.logger.Log("event", "end", "error", t.Err().Error())
+		} else {
+			//panic??
+			t.logger.Log("event", "end", "error", "complited fetch must return error")
+		}
+		return t
+	}
+
+	//Run transform in a new goroutine
+	go fc.run(t, fc.transformItems)
+
 	return t
 }
 
@@ -842,6 +882,7 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 	}
 
 	//check by fetch state
+	//statePixelLoadStarted
 	if t.fetchState == statePixelLoadStarted {
 		//reload sequence
 		if states.BaseState == pc.StateUnzip {
@@ -850,7 +891,12 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 			return false, nil
 		}
 	}
-
+	//statePixelConfirmed
+	if t.fetchState == statePixelConfirmed {
+		//expects that zip loaded
+		//if not or deleted - will restart from very beginning
+		co.State = pc.StateUnzip
+	}
 	//clear sub orders
 	if states.ChildState > 0 {
 		_ = fc.pcClient.ClearGroup(t.ctx, fc.source, co.GroupID, co.ID)

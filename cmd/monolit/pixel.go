@@ -181,7 +181,7 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	fc := transform.NewFactory(ppClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
 
 	//TODO for test
-	fc.SetDebug(true)
+	//fc.SetDebug(true)
 
 	//create manager
 	mn := transform.NewManager(fc, viper.GetInt("threads"), viper.GetInt("interval"), logger)
