@@ -22,7 +22,7 @@ func defaultHTTPOptions(cli *http0.Client, logger log.Logger) map[string][]http.
 		if logger != nil {
 			options[v] = append(options[v], beforeURILogger(log.With(logger, "method", v)))
 		}
-		options[v] = append(options[v], beforeSetDebug(true))
+		options[v] = append(options[v], beforeSetDebug(false))
 	}
 	return options
 }

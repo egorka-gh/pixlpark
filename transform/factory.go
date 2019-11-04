@@ -354,6 +354,7 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 	for po, err = fc.queuePop(t.ctx, t.fetchState); err == nil; {
 		logger := log.With(t.logger, "order", po.ID)
 		logger.Log("fetch", "start")
+		t.ppOrder = po
 
 		co := fromPPOrder(po, fc.source, "@")
 		co.State = pc.StateLoadWaite
@@ -383,7 +384,6 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 			}
 		}
 		//сan load stop fetching
-		t.ppOrder = po
 		t.pcBaseOrder = co
 		//next t logs will go vs order id
 		t.logger = logger
