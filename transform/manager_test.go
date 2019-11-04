@@ -59,6 +59,7 @@ type testFactory struct {
 	loadRestart      provider
 	transformRestart provider
 	finalizeRestart  provider
+	softErrorRestart provider
 	doOrder          provider
 }
 
@@ -77,6 +78,9 @@ func (f *testFactory) FinalizeRestart(ctx context.Context) *Transform {
 func (f *testFactory) DoOrder(ctx context.Context, notused string) *Transform {
 	return f.doOrder(ctx)
 }
+func (f *testFactory) SoftErrorRestart(ctx context.Context) *Transform {
+	return f.softErrorRestart(ctx)
+}
 func (f *testFactory) SetDebug(debug bool) {
 	//noop
 }
@@ -90,8 +94,8 @@ func createFactory(callsPerCycle, cycles int32, counter chan<- int) (Factory, ch
 		loadRestart:      createProvider("LoadRestart", callsPerCycle, chCnt),
 		transformRestart: createProvider("TransformRestart", callsPerCycle, chCnt),
 		finalizeRestart:  createProvider("FinalizeRestart", callsPerCycle, chCnt),
-
-		doOrder: createProvider("DoOrder", callsPerCycle, chCnt),
+		softErrorRestart: createProvider("SoftErrorRestart", callsPerCycle, chCnt),
+		doOrder:          createProvider("DoOrder", callsPerCycle, chCnt),
 	}
 
 	go func() {
