@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	log "github.com/go-kit/kit/log"
+
 	pc "github.com/egorka-gh/pixlpark/photocycle"
 	pp "github.com/egorka-gh/pixlpark/pixlpark/service"
 )
@@ -30,6 +32,7 @@ func (fc *baseFactory) DoOrder(ctx context.Context, id string) *Transform {
 		ctx:     ctx,
 		cancel:  cancel,
 		ppOrder: pp.Order{ID: id},
+		logger:  log.With(fc.logger, "sequence", "LoadRestart"),
 	}
 
 	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.

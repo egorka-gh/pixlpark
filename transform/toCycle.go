@@ -48,17 +48,58 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 		return ErrTransform{fmt.Errorf("Не верное значение sku длины (height) %s", h)}
 	}
 
-	//check for photos base folder (copies_1)
-	basePath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName, "copies_1")
-	if folderExists(basePath) == false {
-		return errCantTransform
+	//scan item folder for subfolders vs name like copies_d+
+	itemPath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName)
+	itemFolder, err := folderOpen(itemPath)
+	if err != nil {
+		return ErrFileSystem{err}
 	}
-	//check for subfolders borders and noborders
-	bList, _ := fillList(path.Join(basePath, "borders"))
-	nbList, _ := fillList(path.Join(basePath, "noborders"))
-	if len(bList) == 0 && len(nbList) == 0 {
-		//folders not exists or empty
-		return errCantTransform
+	defer itemFolder.Close()
+	itemFolderFiles, err := itemFolder.Readdir(-1)
+	if err != nil {
+		return ErrFileSystem{err}
+	}
+	rei, err := regexp.Compile(`^copies_(\d+)`)
+	if err != nil {
+		return err
+	}
+	withBorders := make([]fileCopy, 0, item.Quantity)
+	noBorders := make([]fileCopy, 0, item.Quantity)
+	for _, fi := range itemFolderFiles {
+		if !fi.IsDir() {
+			//not folder
+			continue
+		}
+		sm := rei.FindStringSubmatch(fi.Name())
+		if len(sm) != 2 {
+			//not copies_d+
+			continue
+		}
+		printsCount, err := strconv.Atoi(sm[1])
+		if err != nil {
+			return err
+		}
+		if printsCount < 1 {
+			printsCount = 1
+		}
+		//process subfolder
+		basePath := path.Join(itemPath, fi.Name())
+		//check for subfolders borders and noborders
+		bList, _ := fillList(path.Join(basePath, "borders"), printsCount)
+		nbList, _ := fillList(path.Join(basePath, "noborders"), printsCount)
+		if len(bList) == 0 && len(nbList) == 0 {
+			//folders not exists or empty
+			return errCantTransform
+		}
+		withBorders = append(withBorders, bList...)
+		noBorders = append(noBorders, nbList...)
+	}
+	//rename files to awoid name conflicts
+	for i, fl := range withBorders {
+		withBorders[i].NewName = fmt.Sprintf("%dWN_%04d%s", fl.Qtty, i, filepath.Ext(fl.OldName))
+	}
+	for i, fl := range noBorders {
+		noBorders[i].NewName = fmt.Sprintf("%dCN_%04d%s", fl.Qtty, i, filepath.Ext(fl.OldName))
 	}
 
 	//copy & create order printgroup(s)/printgroupfiles
@@ -70,7 +111,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 		return ErrFileSystem{err}
 	}
 
-	lsts := [][]fileCopy{bList, nbList}
+	lsts := [][]fileCopy{withBorders, noBorders}
 	for i, list := range lsts {
 		if len(list) == 0 {
 			continue
@@ -109,15 +150,15 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 			return err
 		}
 		if done > 0 {
-			order.FotosNum = order.FotosNum + done
 			pg.FileNum = done
-			pg.Prints = done
 			pg.Files = make([]pc.PrintGroupFile, 0, done)
 			for _, fi := range list {
 				if fi.Process {
-					pg.Files = append(pg.Files, pc.PrintGroupFile{PrintGroupID: pg.ID, FileName: path.Join("print", fi.NewName), Caption: fi.NewName, PrintQtty: 1})
+					pg.Files = append(pg.Files, pc.PrintGroupFile{PrintGroupID: pg.ID, FileName: path.Join("print", fi.NewName), Caption: fi.OldName, PrintQtty: fi.Qtty})
+					pg.Prints += fi.Qtty
 				}
 			}
+			order.FotosNum += pg.Prints
 			order.PrintGroups = append(order.PrintGroups, pg)
 		}
 	}
@@ -149,7 +190,7 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 	order.HasCover = alias.HasCover
 	//get file list
 	basePath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName)
-	list, err := fillList(basePath)
+	list, err := fillList(basePath, 1)
 	if err != nil {
 		return ErrSourceNotFound{err}
 	}
@@ -287,11 +328,12 @@ type fileCopy struct {
 	OldName  string
 	NewName  string
 	Process  bool
+	Qtty     int
 	SheetIdx int
 	BookIdx  int
 }
 
-func fillList(path string) ([]fileCopy, error) {
+func fillList(path string, qtty int) ([]fileCopy, error) {
 
 	f, err := folderOpen(path)
 	if err != nil {
@@ -307,7 +349,7 @@ func fillList(path string) ([]fileCopy, error) {
 	var res = make([]fileCopy, 0, len(list))
 	for _, fi := range list {
 		if !fi.IsDir() {
-			res = append(res, fileCopy{OldPath: path, OldName: fi.Name(), NewName: fi.Name(), Process: allowedExt[filepath.Ext(fi.Name())]})
+			res = append(res, fileCopy{OldPath: path, OldName: fi.Name(), NewName: fi.Name(), Process: allowedExt[filepath.Ext(fi.Name())], Qtty: qtty})
 		}
 	}
 	return res, nil

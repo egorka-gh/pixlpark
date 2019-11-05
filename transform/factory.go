@@ -566,6 +566,8 @@ func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
 	}
 
 	req, err := grab.NewRequest(fl, t.ppOrder.DownloadLink)
+	//TODO prevent reusing connection
+	req.HTTPRequest.Close = true
 	if err != nil {
 		logger.Log("error", err.Error())
 		t.err = ErrService{err}
