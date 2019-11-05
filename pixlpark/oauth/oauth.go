@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth/internal"
 	"github.com/go-kit/kit/log"
@@ -449,7 +450,7 @@ func NewClient(ctx context.Context, src TokenSource) *http.Client {
 	//TODO add timeout??
 	//timeout := time.Duration(20 * time.Second)
 	return &http.Client{
-		//Timeout: timeout,
+		Timeout: time.Second * 20,
 		Transport: &Transport{
 			Base:   internal.ContextClient(ctx).Transport,
 			Source: ReuseTokenSource(nil, src),

@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	clog "log"
+	"net"
+	"net/http"
+	_ "net/http/pprof" // as a side effect, registers the pprof endpoints.
 	"os"
 	"path"
 
@@ -75,9 +78,23 @@ func main() {
 
 func (p *program) Start(s service1.Service) error {
 	g, rep, err := initPixel()
+	//init http server
 	if err != nil {
 		return err
 	}
+
+	debugListener, err := net.Listen("tcp", "localhost:8888")
+	if err != nil {
+		return err
+	}
+	g.Add(func() error {
+		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)
+		dLogger.Info("Debug endpoint at http://localhost:8888/debug/pprof/.")
+		return http.Serve(debugListener, http.DefaultServeMux)
+	}, func(error) {
+		debugListener.Close()
+	})
+
 	p.group = g
 	p.rep = rep
 	p.interrupt = make(chan struct{})
