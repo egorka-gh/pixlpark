@@ -1,0 +1,98 @@
+POST data
+Array
+(
+    [appkey] => ********************
+    [cmd] => group
+    [args] => Array
+        (
+            [number] => 242763
+        )
+
+)
+
+Result
+Array
+(
+    [version] => 0.1
+    [cmd] => group
+    [args] => Array
+        (
+            [number] => 242763
+        )
+
+    [result] => Array
+        (
+            [id] => 242763
+            [number] => 242763RU
+            [member_id] => 17511
+            [status] => 60
+            [status_text] => Получен
+            [execution_tstamp] => 1548941680
+            [execution_date] => 31.01.2019
+            [orders] => Array
+                (
+                    [576019] => 603759
+                )
+
+            [amount] => 1
+            [weight] => 1.814 кг
+            [delivery_id] => 57
+            [delivery_title] => Боксберри — суперцена доставки по всей РФ 180 руб.
+            [address_text] => 
+            [address] => Array
+                (
+                    [type] => netprint
+                    [lastname] => Воробьёва
+                    [firstname] => Людмила
+                    [middlename] => Витальевна
+                    [phone] => +79023550341
+                    [email] => vorobeva_27.04@mail.ru
+                    [passport] => 
+                    [passport_date] => 
+                    [postal] => 
+                    [region] => 
+                    [district] => 
+                    [city] => 
+                    [street] => 
+                    [home] => 
+                    [flat] => 
+                    [comment] => 
+                    [address] => 
+                    [metro] => 
+                    [delivery_time] => 
+                    [slCity] => 0
+                    [slPickup] => 0
+                    [atDeliveryType] => 0
+                    [dlDeliveryType] => 0
+                    [person] => 
+                    [city_id] => 172949
+                    [dellinCity] => 0
+                    [dellinTerminal] => 0
+                    [dellinAddressId] => 0
+                    [dellinPhoneId] => 0
+                    [dellinPersonId] => 0
+                    [dellinCounterAgent] => 0
+                    [slSrokDostavki] => 
+                    [npCity] => 125
+                    [npPickup] => 59530
+                )
+
+            [boxes] => Array
+                (
+                    [0] => Array
+                        (
+                            [id] => 184915
+                            [number] => 1
+                            [barcode] => 
+                            [weight] => 1814
+                            [orderId] => 8189836817366612316
+                            [orderNumber] => 20190121-FFM37-026-048860
+                        )
+
+                )
+
+            [messages] => 
+        )
+
+)
+

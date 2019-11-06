@@ -370,7 +370,7 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 		//check states in cycle
 		ok := false
 		ok, inerErr = fc.checkCreateInCycle(t, co)
-		if !ok {
+		if !ok && inerErr != nil {
 			logger.Log("skip", inerErr.Error())
 			continue
 		}
@@ -874,13 +874,15 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 
 	if states.BaseState == pc.StateCanceledPHCycle {
 		//cancel in pp
-		_ = fc.setPixelState(t, statePixelAbort, "Заказ отменен в PhotoCycle")
-		return false, nil
+		err = errors.New("Заказ отменен в PhotoCycle")
+		_ = fc.setPixelState(t, statePixelAbort, err.Error())
+		return false, err
 	}
 	if states.ChildState > pc.StatePrintWaite {
 		//cancel in pp
-		_ = fc.setPixelState(t, statePixelAbort, "Заказ отправлен на печать в PhotoCycle")
-		return false, nil
+		err = errors.New("Запуск заказа отправленного на печать в PhotoCycle")
+		_ = fc.setPixelState(t, statePixelAbort, err.Error())
+		return false, err
 	}
 
 	//check by fetch state
@@ -890,7 +892,9 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 		if states.BaseState == pc.StateUnzip {
 			//order for retransfom sequence (loaded but not transformed)
 			//skip
-			return false, nil
+			err = fmt.Errorf("Не соответствие статусов pixel:%s, cycle:StateUnzip", t.fetchState)
+			//_ = fc.setPixelState(t, "", err.Error())
+			return false, err
 		}
 	}
 	//statePixelConfirmed
