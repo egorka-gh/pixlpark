@@ -132,6 +132,7 @@ func readConfig() error {
 	viper.SetDefault("pixelpark.user", "photo.cycle@yandex.by")                               //pixelpark user email to post messages to api
 	viper.SetDefault("pixelpark.oauth.PublicKey", "aac2028cc33c4970b9e1a829ca7acd7b")         //oauth PublicKey
 	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey
+	viper.SetDefault("paperIdMap", map[string]string{"10": "Глянцевая", "11": "Матовая", "12": "Металлик", "13": "Шелк"})
 
 	path, err := osext.ExecutableFolder()
 	if err != nil {

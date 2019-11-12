@@ -5,17 +5,16 @@ import (
 	"errors"
 	"fmt"
 	clog "log"
-	"net"
 	"net/http"
 	_ "net/http/pprof" // as a side effect, registers the pprof endpoints.
 	"os"
 	"path"
+	"time"
 
 	cycle "github.com/egorka-gh/pixlpark/photocycle"
-	"github.com/egorka-gh/pixlpark/photocycle/repo"
+	proxy "github.com/egorka-gh/pixlpark/photocycle/service"
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/pixlpark/service"
-	"github.com/egorka-gh/pixlpark/transform"
 	log "github.com/go-kit/kit/log"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/kardianos/osext"
@@ -78,22 +77,9 @@ func main() {
 
 func (p *program) Start(s service1.Service) error {
 	g, rep, err := initPixel()
-	//init http server
 	if err != nil {
 		return err
 	}
-
-	debugListener, err := net.Listen("tcp", "localhost:8888")
-	if err != nil {
-		return err
-	}
-	g.Add(func() error {
-		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)
-		dLogger.Info("Debug endpoint at http://localhost:8888/debug/pprof/.")
-		return http.Serve(debugListener, http.DefaultServeMux)
-	}, func(error) {
-		debugListener.Close()
-	})
 
 	p.group = g
 	p.rep = rep
@@ -113,7 +99,11 @@ func (p *program) Start(s service1.Service) error {
 
 func (p *program) run() {
 	//close db cnn
-	defer p.rep.Close()
+	defer func() {
+		if p.rep != nil {
+			p.rep.Close()
+		}
+	}()
 	running := make(chan struct{})
 	//initCancelInterrupt
 	p.group.Add(
@@ -163,10 +153,18 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	}
 	if viper.GetString("pixelpark.oauth.PublicKey") == "" || viper.GetString("pixelpark.oauth.PrivateKey") == "" {
 		return nil, nil, errors.New("Не заданы параметры oauth")
+
 	}
-	if viper.GetString("mysql") == "" {
-		return nil, nil, errors.New("Не задано подключение mysql")
+
+	if viper.GetString("proxy.address") == "" {
+		return nil, nil, errors.New("Не задан host:port для локального сервера")
 	}
+
+	/*
+		if viper.GetString("mysql") == "" {
+			return nil, nil, errors.New("Не задано подключение mysql")
+		}
+	*/
 
 	logger := initLoger(viper.GetString("folders.log"), "pixel")
 
@@ -185,34 +183,53 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	oauthClient := cnf.Client(context.Background(), nil)
 	ppClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(log.With(logger, "level", "transport")))
 
-	//create repro
-	rep, err := repo.New(viper.GetString("mysql"))
-	if err != nil {
-		logger.Log("Open database error", err.Error())
-		return nil, nil, fmt.Errorf("Ошибка подключения к базе данных %s", err.Error())
-	}
+	/*
+		//create repro
+		rep, err := repo.New(viper.GetString("mysql"))
+		if err != nil {
+			logger.Log("Open database error", err.Error())
+			return nil, nil, fmt.Errorf("Ошибка подключения к базе данных %s", err.Error())
+		}
 
-	//TODO log startup params
+		//TODO log startup params
 
-	//create factory
-	fc := transform.NewFactory(ppClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
+		//create factory
+		fc := transform.NewFactory(ppClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
 
-	//TODO for test
-	//fc.SetDebug(true)
+		//TODO for test
+		//fc.SetDebug(true)
 
-	//create manager
-	mn := transform.NewManager(fc, viper.GetInt("threads"), viper.GetInt("interval"), logger)
+		//create manager
+		mn := transform.NewManager(fc, viper.GetInt("threads"), viper.GetInt("interval"), logger)
+	*/
 	g := &group.Group{}
 
+	//init proxy
+	server := &http.Server{
+		Addr:    viper.GetString("proxy.address"),
+		Handler: proxy.NewRouter(ppClient),
+	}
 	g.Add(func() error {
-		mn.Start()
-		mn.Wait()
-		return nil
+		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)
+		//dLogger.Info("Debug endpoint at http://localhost:8888/debug/pprof/.")
+		return server.ListenAndServe()
 	}, func(error) {
-		mn.Quit()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(ctx)
 	})
 
-	return g, rep, nil
+	/*
+		g.Add(func() error {
+			mn.Start()
+			mn.Wait()
+			return nil
+		}, func(error) {
+			mn.Quit()
+		})
+	*/
+
+	return g, nil, nil
 }
 
 func initLoger(logPath, fileName string) log.Logger {
@@ -253,6 +270,7 @@ func readConfig() error {
 	viper.SetDefault("pixelpark.user", "photo.cycle@yandex.by")                               //pixelpark user email to post messages to api
 	viper.SetDefault("pixelpark.oauth.PublicKey", "aac2028cc33c4970b9e1a829ca7acd7b")         //oauth PublicKey
 	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey
+	viper.SetDefault("proxy.address", ":8888")                                                //localhost
 	viper.SetDefault("paperIdMap", map[string]string{"10": "Глянцевая", "11": "Матовая", "12": "Металлик", "13": "Шелк"})
 	path, err := osext.ExecutableFolder()
 	if err != nil {

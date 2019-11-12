@@ -14,6 +14,7 @@ import (
 
 	pc "github.com/egorka-gh/pixlpark/photocycle"
 	pp "github.com/egorka-gh/pixlpark/pixlpark/service"
+	"github.com/spf13/viper"
 )
 
 //can't detect exactly if item is photo product
@@ -302,7 +303,7 @@ func buildExtraInfo(forOrder pc.Order, from pp.OrderItem) pc.OrderExtraInfo {
 		sheets = sheets - 1
 	}
 
-	return pc.OrderExtraInfo{
+	ei := pc.OrderExtraInfo{
 		ID:         forOrder.ID,
 		GroupID:    forOrder.GroupID,
 		Format:     from.Name,
@@ -321,6 +322,23 @@ func buildExtraInfo(forOrder pc.Order, from pp.OrderItem) pc.OrderExtraInfo {
 		Kaptal:        from.Sku()["kaptal"],
 		CoverMaterial: from.Sku()["cover_material"],
 	}
+
+	//translate paper id
+	if ei.Paper != "" {
+		paperMap := viper.GetStringMapString("paperIdMap")
+		if paperMap != nil {
+			paperName := paperMap[ei.Paper]
+			if paperName != "" {
+				ei.Paper = paperName
+			}
+		}
+	}
+	//set format by sku
+	format := from.Sku()["format"]
+	if format != "" {
+		ei.Format = format
+	}
+	return ei
 }
 
 type fileCopy struct {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -111,6 +112,17 @@ func GetMailpackage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// BaseResponse is the base response for cycle
+type BaseResponse struct {
+	Result render.Renderer `json:"result"`
+}
+
+//Render implement Renderer
+func (b *BaseResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	// Pre-processing before a response is marshalled and sent across the wire
+	return nil
+}
+
 // OrderResponse is the response payload for the Order data model.
 type OrderResponse struct {
 	ID    string `json:"id"`
@@ -118,17 +130,19 @@ type OrderResponse struct {
 	//TODO production, group?
 }
 
+//Render implement Renderer
 func (o *OrderResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	// Pre-processing before a response is marshalled and sent across the wire
 	return nil
 }
 
-func NewOrderResponse(order *pp.Order) *OrderResponse {
+//NewOrderResponse creates new OrderResponse
+func NewOrderResponse(order *pp.Order) *BaseResponse {
 	resp := &OrderResponse{ID: order.ID, State: order.Status}
-	return resp
+	return &BaseResponse{Result: resp}
 }
 
-//MailPackage represents the MailPackage dto for cycle web client
+//MailPackageResponse represents the MailPackage dto for cycle web client
 type MailPackageResponse struct {
 	ID            string            `json:"id"`
 	IDName        string            `json:"number"`
@@ -142,12 +156,14 @@ type MailPackageResponse struct {
 	//TODO barcodes?
 }
 
+//Render implement Renderer
 func (m *MailPackageResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	// Pre-processing before a response is marshalled and sent across the wire
 	return nil
 }
 
-func NewMailPackageResponse(order *pp.Order) *MailPackageResponse {
+//NewMailPackageResponse creates new MailPackageResponse
+func NewMailPackageResponse(order *pp.Order) *BaseResponse {
 	resp := &MailPackageResponse{
 		ID:           order.ID,
 		IDName:       order.ID,
@@ -168,9 +184,11 @@ func NewMailPackageResponse(order *pp.Order) *MailPackageResponse {
 	resp.Properties["region"] = order.DeliveryAddress.State
 	//resp.Properties["district"] = TODO
 	resp.Properties["city"] = order.DeliveryAddress.City
-	resp.Properties["street"] = order.DeliveryAddress.City
+	resp.Properties["street"] = order.DeliveryAddress.AddressLine1
+	resp.Properties["home"] = order.DeliveryAddress.AddressLine2
+	resp.Properties["debt_sum"] = fmt.Sprintf("%.2f", order.TotalPrice-order.PaidPrice)
 
-	return resp
+	return &BaseResponse{Result: resp}
 }
 
 //--
@@ -191,6 +209,7 @@ type ErrResponse struct {
 	ErrorText  string `json:"error,omitempty"` // application-level error message, for debugging
 }
 
+//Render implement Renderer
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	if e.HTTPStatusCode == 0 {
 		e.HTTPStatusCode = 400
@@ -202,6 +221,7 @@ func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+//ErrInvalidRequest creates ErrInvalidRequest response from error
 func ErrInvalidRequest(err error) render.Renderer {
 	return &ErrResponse{
 		Err:            err,
@@ -211,6 +231,7 @@ func ErrInvalidRequest(err error) render.Renderer {
 	}
 }
 
+//ErrRender creates ErrRender response from error
 func ErrRender(err error) render.Renderer {
 	return &ErrResponse{
 		Err:            err,
@@ -220,4 +241,5 @@ func ErrRender(err error) render.Renderer {
 	}
 }
 
+//ErrNotFound creates ErrNotFound response
 var ErrNotFound = &ErrResponse{HTTPStatusCode: 404, StatusText: "Resource not found."}
