@@ -57,7 +57,8 @@ func NewRouter(client pp.PPService) *chi.Mux {
 			r.Post("/", GetMailpackage) // cycle allways uses Post, so route it as GET
 		})
 	})
-
+	//mount net/http/pprof
+	r.Mount("/debug", middleware.Profiler())
 	return r
 }
 

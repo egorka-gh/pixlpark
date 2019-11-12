@@ -751,6 +751,7 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		co := fromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", i))
 		co.SourceID = fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID)
 
+		isPhoto := false
 		//try build by alias
 		//intermediate state for buld by alias (then forward to StatePreprocessWaite)
 		co.State = pc.StateLoadComplite
@@ -758,6 +759,7 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		if _, ok := err.(ErrCantTransform); ok == true {
 			//try build photo print
 			//intermediate state for buld photo (then forward to StatePrintWaite)
+			isPhoto = true
 			co.State = pc.StatePreprocessComplite
 			err = fc.transformPhoto(t.ctx, item, &co)
 		}
@@ -785,7 +787,12 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 			fc.setCycleState(t, 0, pc.StateErrPreprocess, msg)
 		} else {
 			//item processed, add order
-			co.ExtraInfo = buildExtraInfo(co, item)
+			exi := buildExtraInfo(co, item)
+			if isPhoto {
+				exi.Sheets = item.Quantity
+				exi.Books = 1
+			}
+			co.ExtraInfo = exi
 			orders = append(orders, co)
 			l.Log("transform", "complite")
 		}

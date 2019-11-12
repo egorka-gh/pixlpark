@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 	clog "log"
-	"net"
 	"net/http"
-	_ "net/http/pprof" // as a side effect, registers the pprof endpoints.
 	"os"
 	"path"
+	"time"
 
 	cycle "github.com/egorka-gh/pixlpark/photocycle"
 	"github.com/egorka-gh/pixlpark/photocycle/repo"
+	proxy "github.com/egorka-gh/pixlpark/photocycle/service"
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/pixlpark/service"
 	"github.com/egorka-gh/pixlpark/transform"
@@ -78,22 +78,9 @@ func main() {
 
 func (p *program) Start(s service1.Service) error {
 	g, rep, err := initPixel()
-	//init http server
 	if err != nil {
 		return err
 	}
-
-	debugListener, err := net.Listen("tcp", "localhost:8888")
-	if err != nil {
-		return err
-	}
-	g.Add(func() error {
-		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)
-		dLogger.Info("Debug endpoint at http://localhost:8888/debug/pprof/.")
-		return http.Serve(debugListener, http.DefaultServeMux)
-	}, func(error) {
-		debugListener.Close()
-	})
 
 	p.group = g
 	p.rep = rep
@@ -113,7 +100,11 @@ func (p *program) Start(s service1.Service) error {
 
 func (p *program) run() {
 	//close db cnn
-	defer p.rep.Close()
+	defer func() {
+		if p.rep != nil {
+			p.rep.Close()
+		}
+	}()
 	running := make(chan struct{})
 	//initCancelInterrupt
 	p.group.Add(
@@ -144,19 +135,6 @@ func (p *program) Stop(s service1.Service) error {
 }
 
 func initPixel() (*group.Group, cycle.Repository, error) {
-
-	/*
-		if err := readConfig(); err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-				// Config file not found; ignore error if desired
-				fmt.Println("Start using default setings")
-			} else {
-				fmt.Println(err.Error())
-				return
-			}
-		}
-	*/
-
 	//TODO check settings
 	if viper.GetInt("source.id") == 0 {
 		return nil, nil, errors.New("Не задано ID источника")
@@ -166,6 +144,9 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	}
 	if viper.GetString("mysql") == "" {
 		return nil, nil, errors.New("Не задано подключение mysql")
+	}
+	if viper.GetString("proxy.address") == "" {
+		return nil, nil, errors.New("Не задан host:port для локального сервера")
 	}
 
 	logger := initLoger(viper.GetString("folders.log"), "pixel")
@@ -197,19 +178,38 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	//create factory
 	fc := transform.NewFactory(ppClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
 
-	//TODO for test
-	//fc.SetDebug(true)
+	//check test mode
+	if viper.GetBool("debug") {
+		fc.SetDebug(true)
+	}
 
 	//create manager
 	mn := transform.NewManager(fc, viper.GetInt("threads"), viper.GetInt("interval"), logger)
 	g := &group.Group{}
 
+	//init transform manager
 	g.Add(func() error {
 		mn.Start()
 		mn.Wait()
 		return nil
 	}, func(error) {
 		mn.Quit()
+	})
+
+	//init proxy
+	server := &http.Server{
+		Addr:    viper.GetString("proxy.address"),
+		Handler: proxy.NewRouter(ppClient),
+	}
+	g.Add(func() error {
+		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)
+		dLogger.Info(fmt.Sprintf("Starting proxy to pixel at %s.", server.Addr))
+		dLogger.Info(fmt.Sprintf("Debug endpoint at %s/debug/pprof/.", server.Addr))
+		return server.ListenAndServe()
+	}, func(error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(ctx)
 	})
 
 	return g, rep, nil
@@ -253,7 +253,10 @@ func readConfig() error {
 	viper.SetDefault("pixelpark.user", "photo.cycle@yandex.by")                               //pixelpark user email to post messages to api
 	viper.SetDefault("pixelpark.oauth.PublicKey", "aac2028cc33c4970b9e1a829ca7acd7b")         //oauth PublicKey
 	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey
+	viper.SetDefault("proxy.address", ":8888")                                                //localhost
 	viper.SetDefault("paperIdMap", map[string]string{"10": "Глянцевая", "11": "Матовая", "12": "Металлик", "13": "Шелк"})
+	viper.SetDefault("debug", false) //set debug mode (will not change pixel orders states)
+
 	path, err := osext.ExecutableFolder()
 	if err != nil {
 		path = "."
