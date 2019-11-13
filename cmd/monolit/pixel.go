@@ -180,6 +180,7 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 
 	//check test mode
 	if viper.GetBool("debug") {
+		dLogger.Info("Run in debug mode.")
 		fc.SetDebug(true)
 	}
 
@@ -203,7 +204,7 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	}
 	g.Add(func() error {
 		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)
-		dLogger.Info(fmt.Sprintf("Starting proxy to pixel at %s.", server.Addr))
+		dLogger.Info(fmt.Sprintf("Starting pixel proxy at %s.", server.Addr))
 		dLogger.Info(fmt.Sprintf("Debug endpoint at %s/debug/pprof/.", server.Addr))
 		return server.ListenAndServe()
 	}, func(error) {

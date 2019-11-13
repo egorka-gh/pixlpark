@@ -108,6 +108,7 @@ var (
 )
 
 // NewFactory returns a new transform Factory, using provided configuration.
+//TODO refactor to config
 func NewFactory(pixlparkClient pp.PPService, photocycleClient pc.Repository, sourse, production int, workFolder, cycleFolder, cyclePrtFolder, pixlparkUserEmail string, logger log.Logger) Factory {
 	if logger == nil {
 		logger = log.NewNopLogger()
