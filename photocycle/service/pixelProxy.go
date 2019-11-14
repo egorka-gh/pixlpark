@@ -127,7 +127,7 @@ func (b *BaseResponse) Render(w http.ResponseWriter, r *http.Request) error {
 // OrderResponse is the response payload for the Order data model.
 type OrderResponse struct {
 	ID    string `json:"id"`
-	State string `json:"state"`
+	State string `json:"status"`
 	//TODO production, group?
 }
 
