@@ -44,9 +44,12 @@ func NewRouter(client pp.PPService) *chi.Mux {
 		   		r.With(ArticleCtx).Get("/{articleSlug:[a-z-]+}", GetArticle)
 		*/
 		r.Route("/order/{orderID}", func(r chi.Router) {
-			r.Use(OrderCtx)       // Load the *Order on the request context
-			r.Get("/", GetOrder)  // GET /order/123 (REST standard)
-			r.Post("/", GetOrder) // cycle allways uses Post, so route it as GET
+			//r.Use(OrderCtx)       // Load the *Order on the request context
+			r.With(OrderCtx).Get("/", GetOrder)  // GET /order/123 (REST standard)
+			r.With(OrderCtx).Post("/", GetOrder) // cycle allways uses Post, so route it as GET
+			r.Post("/status", SetOrderState)     //set order status, not PUT - cycle allways uses Post
+			//4 debug
+			//r.Get("/status", SetOrderState)
 		})
 
 		//get order and transform to MailPackage payload as it expect cycle
@@ -86,6 +89,33 @@ func OrderCtx(next http.Handler) http.Handler {
 	})
 }
 
+//SetOrderState redirects method to pixel api
+func SetOrderState(w http.ResponseWriter, r *http.Request) {
+
+	orderID := chi.URLParam(r, "orderID")
+	if orderID == "" {
+		render.Render(w, r, ErrNotFound)
+		return
+	}
+	//parse status from post form
+	status := r.FormValue("status")
+	if status == "" {
+		render.Render(w, r, ErrNotFound)
+		return
+	}
+
+	//render.Render(w, r, &BaseResponse{Result: message(fmt.Sprintf("ID: %s; State: %s", orderID, status))})
+	if err := ppClient.SetOrderStatus(r.Context(), orderID, status, true); err != nil {
+		render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+	if err := render.Render(w, r, &BaseResponse{Result: message("OK")}); err != nil {
+		render.Render(w, r, ErrRender(err))
+		return
+	}
+
+}
+
 // GetOrder returns the specific Order. It just
 // fetches the Order right off the context
 func GetOrder(w http.ResponseWriter, r *http.Request) {
@@ -121,6 +151,12 @@ type BaseResponse struct {
 //Render implement Renderer
 func (b *BaseResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	// Pre-processing before a response is marshalled and sent across the wire
+	return nil
+}
+
+type message string
+
+func (m message) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
