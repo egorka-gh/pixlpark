@@ -148,6 +148,7 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	if viper.GetString("proxy.address") == "" {
 		return nil, nil, errors.New("Не задан host:port для локального сервера")
 	}
+	//TODO log startup params
 
 	logger := initLoger(viper.GetString("folders.log"), "pixel")
 
@@ -172,8 +173,6 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 		logger.Log("Open database error", err.Error())
 		return nil, nil, fmt.Errorf("Ошибка подключения к базе данных %s", err.Error())
 	}
-
-	//TODO log startup params
 
 	//create factory
 	fc := transform.NewFactory(ppClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
