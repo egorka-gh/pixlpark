@@ -245,13 +245,15 @@ func (m *Manager) doWork(ctx context.Context) {
 		return
 	}
 
-	//restart after soft error
-	m.currState = "Перезапуск подтвержденных ошибок"
-	err = m.runQueue(ctx, m.factory.SoftErrorRestart, true)
-	if err != nil || ctx.Err() != nil {
-		m.logNotNilErr("LoadRestart", err, ctx.Err())
-		return
-	}
+	/*
+		//restart after soft error
+		m.currState = "Перезапуск подтвержденных ошибок"
+		err = m.runQueue(ctx, m.factory.SoftErrorRestart, true)
+		if err != nil || ctx.Err() != nil {
+			m.logNotNilErr("LoadRestart", err, ctx.Err())
+			return
+		}
+	*/
 
 	m.currState = "Ожидание"
 }

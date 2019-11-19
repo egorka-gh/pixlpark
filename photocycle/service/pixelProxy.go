@@ -55,7 +55,6 @@ func NewRouter(client pp.PPService) *chi.Mux {
 		//get order and transform to MailPackage payload as it expect cycle
 		r.Route("/mailpackage/{orderID}", func(r chi.Router) {
 			r.Use(OrderCtx) // Load the *Order on the request context
-			//TODO implement GetMailpackage
 			r.Get("/", GetMailpackage)
 			r.Post("/", GetMailpackage) // cycle allways uses Post, so route it as GET
 		})

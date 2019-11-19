@@ -27,7 +27,7 @@ type Factory interface {
 	// fetch new order and perfom full trunsform
 	LoadNew(ctx context.Context) *Transform
 	//SoftErrorRestart restarts orders after confirmed soft error
-	SoftErrorRestart(ctx context.Context) *Transform
+	//SoftErrorRestart(ctx context.Context) *Transform
 	//LoadRestart reload orders that allready started (statePixelLoadStarted)
 	LoadRestart(ctx context.Context) *Transform
 	//TransformRestart restart incompleted transforms
@@ -209,18 +209,21 @@ func (fc *baseFactory) LoadRestart(ctx context.Context) *Transform {
 	return t
 }
 
-//SoftErrorRestart reload orders in state statePixelWaiteConfirm
+/*
+//SoftErrorRestart reload orders in state statePixelConfirmed
 // orders that allready started and has some reparable error (now orders that not transformed - unknown product)
-// behavior same as LoadNew exepct fetch orders in state statePixelWaiteConfirm
+// behavior same as LoadNew exepct fetch orders in state statePixelConfirmed
 // resumes processing from transformItems
-// get ordrers vs statePixelWaiteConfirm in PP, expected state in cycle StateUnzip (expect but not check)
+// get ordrers vs statePixelConfirmed in PP, expected state in cycle StateUnzip (expect but not check)
+//TODO buggi state seq
+//либо рестартовать чз statePixelLoadStarted, либо переставить statePixelConfirmed и statePixelConfirmed
 func (fc *baseFactory) SoftErrorRestart(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	t := &Transform{
-		fetchState: statePixelWaiteConfirm,
+		fetchState: statePixelConfirmed,
 		Start:      time.Now(),
 		Done:       make(chan struct{}, 0),
 		ctx:        ctx,
@@ -246,6 +249,7 @@ func (fc *baseFactory) SoftErrorRestart(ctx context.Context) *Transform {
 
 	return t
 }
+*/
 
 //TransformRestart restart incompleted transforms
 // orders that loaded and unziped but not complete for some reason (service stop or some error while transform)
@@ -905,12 +909,14 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 			return false, err
 		}
 	}
-	//statePixelConfirmed
-	if t.fetchState == statePixelConfirmed {
-		//expects that zip loaded
-		//if not or deleted - will restart from very beginning
-		co.State = pc.StateUnzip
-	}
+	/*
+		//statePixelConfirmed
+		if t.fetchState == statePixelConfirmed {
+			//expects that zip loaded
+			//if not or deleted - will restart from very beginning
+			co.State = pc.StateUnzip
+		}
+	*/
 	//clear sub orders
 	if states.ChildState > 0 {
 		_ = fc.pcClient.ClearGroup(t.ctx, fc.source, co.GroupID, co.ID)
