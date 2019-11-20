@@ -204,9 +204,12 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	g := &group.Group{}
 
 	//init proxy
+	pcfg := proxy.Config{
+		PixelClient: ppClient,
+	}
 	server := &http.Server{
 		Addr:    viper.GetString("proxy.address"),
-		Handler: proxy.NewRouter(ppClient),
+		Handler: proxy.New(&pcfg),
 	}
 	g.Add(func() error {
 		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)

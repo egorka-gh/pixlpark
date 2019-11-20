@@ -205,3 +205,10 @@ func (b *basicRepository) LoadBaseOrderByChildState(ctx context.Context, source,
 
 	return res, err
 }
+
+func (b *basicRepository) CountCurrentOrders(ctx context.Context, source int) (int, error) {
+	var res int
+	sql := "SELECT COUNT(DISTINCT o.group_id) FROM orders o WHERE o.state BETWEEN 100 AND 450 AND o.source = ?"
+	err := b.db.GetContext(ctx, &res, sql, source)
+	return res, err
+}

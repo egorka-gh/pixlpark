@@ -136,7 +136,8 @@ func (p *program) Stop(s service1.Service) error {
 
 func initPixel() (*group.Group, cycle.Repository, error) {
 	//TODO check settings
-	if viper.GetInt("source.id") == 0 {
+	instanseID := viper.GetInt("source.id")
+	if instanseID == 0 {
 		return nil, nil, errors.New("Не задано ID источника")
 	}
 	if viper.GetString("pixelpark.oauth.PublicKey") == "" || viper.GetString("pixelpark.oauth.PrivateKey") == "" {
@@ -175,7 +176,7 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	}
 
 	//create factory
-	fc := transform.NewFactory(ppClient, rep, viper.GetInt("source.id"), viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
+	fc := transform.NewFactory(ppClient, rep, instanseID, viper.GetInt("production.pixel"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
 
 	//check test mode
 	if viper.GetBool("debug") {
@@ -197,9 +198,17 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	})
 
 	//init proxy
+	//init proxy
+	pcfg := proxy.Config{
+		PixelClient: ppClient,
+		CycleClient: rep,
+		Manager:     mn,
+		Source:      instanseID,
+	}
+
 	server := &http.Server{
 		Addr:    viper.GetString("proxy.address"),
-		Handler: proxy.NewRouter(ppClient),
+		Handler: proxy.New(&pcfg),
 	}
 	g.Add(func() error {
 		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)

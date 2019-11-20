@@ -38,6 +38,9 @@ type Factory interface {
 	// DoOrder loads order and perfom full trunsform (4 tests only)
 	DoOrder(ctx context.Context, id string) *Transform
 
+	//QueueLen returns current queues lenth
+	QueueLen() int
+
 	SetDebug(debug bool)
 }
 
@@ -176,7 +179,8 @@ func (fc *baseFactory) LoadNew(ctx context.Context) *Transform {
 
 //LoadRestart reload orders that allready started (statePixelLoadStarted)
 // but not complete for some reason (service stop, some error while load, unzip)
-// behavior same as LoadNew exepct fetch orders in state statePixelLoadStarted
+// also restarts orders after soft error statePixelWaiteConfirm, incomplited transform confirmed by user
+// behavior same as LoadNew exept fetch orders in state statePixelLoadStarted
 // get ordrers vs statePixelLoadStarted in PP && StateLoadWaite in Cycle
 func (fc *baseFactory) LoadRestart(ctx context.Context) *Transform {
 	if ctx == nil {
@@ -314,6 +318,17 @@ func (fc *baseFactory) FinalizeRestart(ctx context.Context) *Transform {
 	t.logger.Log("event", "end", "error", "Got incompleted transform")
 	fc.run(t, fc.closeTransform)
 	return t
+}
+
+//QueueLen returns current queues lenth
+func (fc *baseFactory) QueueLen() int {
+	var res int
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	for key := range fc.queues {
+		res += len(fc.queues[key])
+	}
+	return res
 }
 
 // An stateFunc is factory unit of work

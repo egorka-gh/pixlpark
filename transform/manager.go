@@ -2,6 +2,7 @@ package transform
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -209,6 +210,41 @@ func (m *Manager) Quit() {
 //Wait blocks caller till manager stops
 func (m *Manager) Wait() {
 	m.wg.Wait()
+}
+
+//ManagerInfo holds manager info
+type ManagerInfo struct {
+	StateCaption  string  `json:"caption"`
+	IsRunning     bool    `json:"running"`
+	Threads       int     `json:"threads"`
+	OrderIds      string  `json:"ids"`
+	OrderCount    int     `json:"count"`
+	QueueLen      int     `json:"queue"`
+	DownloadSpeed float64 `json:"speed"`
+}
+
+//GetInfo returns ManagerInfo
+func (m *Manager) GetInfo() (info ManagerInfo) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var speed float64
+	ids := make([]string, 0, m.concurrency)
+	for key := range m.transforms {
+		ids = append(ids, key)
+		speed += m.transforms[key].BytesPerSecond()
+	}
+	inf := ManagerInfo{
+		StateCaption:  m.currState,
+		IsRunning:     m.IsRunning(),
+		Threads:       m.concurrency,
+		OrderIds:      strings.Join(ids[:], ","),
+		OrderCount:    len(ids),
+		QueueLen:      m.factory.QueueLen(),
+		DownloadSpeed: speed / float64(1024*1024),
+	}
+
+	return inf
 }
 
 //run regular sequense, new first then restart stuck orders

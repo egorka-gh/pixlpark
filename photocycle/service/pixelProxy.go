@@ -9,14 +9,38 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 
+	pc "github.com/egorka-gh/pixlpark/photocycle"
 	pp "github.com/egorka-gh/pixlpark/pixlpark/service"
+	"github.com/egorka-gh/pixlpark/transform"
 )
 
-var ppClient pp.PPService
+//Config to create mux
+type Config struct {
+	PixelClient pp.PPService
+	CycleClient pc.Repository
+	Manager     *transform.Manager
+	Source      int
+}
+
+type proxy struct {
+	mux    *chi.Mux
+	config *Config
+}
+
+func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	p.mux.ServeHTTP(w, r)
+}
+
+//New creats http.Handler
+func New(config *Config) http.Handler {
+	return &proxy{
+		config: config,
+		mux:    createRouter(config),
+	}
+}
 
 //NewRouter creates chi.Mux
-func NewRouter(client pp.PPService) *chi.Mux {
-	ppClient = client
+func createRouter(config *Config) *chi.Mux {
 	r := chi.NewRouter()
 	//r.Use(middleware.RequestID)
 	//r.Use(middleware.Logger)
@@ -45,19 +69,31 @@ func NewRouter(client pp.PPService) *chi.Mux {
 		*/
 		r.Route("/order/{orderID}", func(r chi.Router) {
 			//r.Use(OrderCtx)       // Load the *Order on the request context
-			r.With(OrderCtx).Get("/", GetOrder)  // GET /order/123 (REST standard)
-			r.With(OrderCtx).Post("/", GetOrder) // cycle allways uses Post, so route it as GET
-			r.Post("/status", SetOrderState)     //set order status, not PUT - cycle allways uses Post
+			r.With(config.OrderCtx).Get("/", GetOrder)  // GET /order/123 (REST standard)
+			r.With(config.OrderCtx).Post("/", GetOrder) // cycle allways uses Post, so route it as GET
+			r.Post("/status", config.SetOrderState)     //set order status, not PUT - cycle allways uses Post
 			//4 debug
 			//r.Get("/status", SetOrderState)
 		})
 
 		//get order and transform to MailPackage payload as it expect cycle
 		r.Route("/mailpackage/{orderID}", func(r chi.Router) {
-			r.Use(OrderCtx) // Load the *Order on the request context
+			r.Use(config.OrderCtx) // Load the *Order on the request context
 			r.Get("/", GetMailpackage)
 			r.Post("/", GetMailpackage) // cycle allways uses Post, so route it as GET
 		})
+
+		//get info
+		r.Route("/info", func(r chi.Router) {
+			//get orders num in pixel and cycle
+			r.Get("/total", config.GetOrdersCount)
+			r.Post("/total", config.GetOrdersCount)
+
+			//get current factory state (queue len, download speed)
+			r.Get("/current", config.GetFactoryInfo)
+			r.Post("/current", config.GetFactoryInfo)
+		})
+
 	})
 	//mount net/http/pprof
 	r.Mount("/debug", middleware.Profiler())
@@ -66,13 +102,18 @@ func NewRouter(client pp.PPService) *chi.Mux {
 
 // OrderCtx middleware is used to load an Order object from pixelpark.
 // In case pixelpark returns some error, we stop here and return a error.
-func OrderCtx(next http.Handler) http.Handler {
+func (c *Config) OrderCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if c.PixelClient == nil {
+			render.Render(w, r, ErrNotConfigured)
+			return
+		}
+
 		var order pp.Order
 		var err error
 
 		if orderID := chi.URLParam(r, "orderID"); orderID != "" {
-			order, err = ppClient.GetOrder(r.Context(), orderID)
+			order, err = c.PixelClient.GetOrder(r.Context(), orderID)
 		} else {
 			render.Render(w, r, ErrNotFound)
 			return
@@ -89,7 +130,11 @@ func OrderCtx(next http.Handler) http.Handler {
 }
 
 //SetOrderState redirects method to pixel api
-func SetOrderState(w http.ResponseWriter, r *http.Request) {
+func (c *Config) SetOrderState(w http.ResponseWriter, r *http.Request) {
+	if c.PixelClient == nil {
+		render.Render(w, r, ErrNotConfigured)
+		return
+	}
 
 	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
@@ -104,7 +149,7 @@ func SetOrderState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//render.Render(w, r, &BaseResponse{Result: message(fmt.Sprintf("ID: %s; State: %s", orderID, status))})
-	if err := ppClient.SetOrderStatus(r.Context(), orderID, status, true); err != nil {
+	if err := c.PixelClient.SetOrderStatus(r.Context(), orderID, status, true); err != nil {
 		render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
@@ -140,6 +185,37 @@ func GetMailpackage(w http.ResponseWriter, r *http.Request) {
 		render.Render(w, r, ErrRender(err))
 		return
 	}
+}
+
+// GetOrdersCount returns total info
+func (c *Config) GetOrdersCount(w http.ResponseWriter, r *http.Request) {
+	if c.PixelClient == nil || c.CycleClient == nil {
+		render.Render(w, r, ErrNotConfigured)
+		return
+	}
+
+	pCount, err := c.PixelClient.CountOrders(r.Context(), []string{pp.StateReadyToProcessing, pp.StatePrepressCoordination, pp.StatePrepressCoordinationAwaitingReply, pp.StatePrinting})
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+	cCount, err := c.CycleClient.CountCurrentOrders(r.Context(), c.Source)
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+
+	render.Render(w, r, &BaseResponse{Result: &InfoTotalResponse{Site: pCount, Cycle: cCount}})
+}
+
+// GetFactoryInfo returns current info
+func (c *Config) GetFactoryInfo(w http.ResponseWriter, r *http.Request) {
+	if c.Manager == nil {
+		render.Render(w, r, ErrNotConfigured)
+		return
+	}
+	inf := InfoFactoryResponse(c.Manager.GetInfo())
+	render.Render(w, r, &BaseResponse{Result: &inf})
 }
 
 // BaseResponse is the base response for cycle
@@ -195,6 +271,25 @@ type MailPackageResponse struct {
 //Render implement Renderer
 func (m *MailPackageResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	// Pre-processing before a response is marshalled and sent across the wire
+	return nil
+}
+
+//InfoTotalResponse represents the InfoTotal dto for cycle web client
+type InfoTotalResponse struct {
+	Site  int `json:"site"`
+	Cycle int `json:"cycle"`
+}
+
+//Render implement Renderer
+func (i *InfoTotalResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+//InfoFactoryResponse represents the factory info dto for cycle web client
+type InfoFactoryResponse transform.ManagerInfo
+
+//Render implement Renderer
+func (i *InfoFactoryResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
@@ -279,3 +374,6 @@ func ErrRender(err error) render.Renderer {
 
 //ErrNotFound creates ErrNotFound response
 var ErrNotFound = &ErrResponse{HTTPStatusCode: 404, StatusText: "Resource not found."}
+
+//ErrNotConfigured creates ErrNotConfigured response
+var ErrNotConfigured = &ErrResponse{HTTPStatusCode: 501, StatusText: "Not configured."}

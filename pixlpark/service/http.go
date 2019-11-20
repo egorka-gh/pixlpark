@@ -91,7 +91,10 @@ func New(instance string, options map[string][]http.ClientOption, mdw map[string
 func encodeCountOrdersRequest(_ context.Context, r *http1.Request, request interface{}) error {
 	req := request.(CountOrdersRequest)
 	q := r.URL.Query()
-	q.Add("statuses", strings.Join(req.Statuses, ","))
+	//q.Add("statuses", strings.Join(req.Statuses, ","))
+	for _, status := range req.Statuses {
+		q.Add("statuses", status)
+	}
 	r.URL.RawQuery = q.Encode()
 	return nil
 }

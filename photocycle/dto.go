@@ -22,6 +22,7 @@ type Repository interface {
 	LoadBaseOrderByChildState(ctx context.Context, source, baseState, childState int) ([]Order, error)
 	FillOrders(ctx context.Context, orders []Order) error
 	StartOrders(ctx context.Context, source, group int, skipID string) error
+	CountCurrentOrders(ctx context.Context, source int) (int, error)
 	Close()
 }
 
