@@ -2,6 +2,7 @@ package transform
 
 import (
 	"context"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -241,7 +242,7 @@ func (m *Manager) GetInfo() (info ManagerInfo) {
 		OrderIds:      strings.Join(ids[:], ","),
 		OrderCount:    len(ids),
 		QueueLen:      m.factory.QueueLen(),
-		DownloadSpeed: speed / float64(1024*1024),
+		DownloadSpeed: math.Round(speed*100/float64(1024*1024)) / 100,
 	}
 
 	return inf
