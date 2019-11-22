@@ -53,6 +53,7 @@ type Manager struct {
 
 	//current state (human-friendly)
 	currState string
+	isPaused  bool
 	debug     bool
 }
 
@@ -64,7 +65,7 @@ func (m *Manager) IsStarted() bool {
 	return m.chControl != nil
 }
 
-//IsRunning is manager running or paused
+//IsRunning is manager running, false if paused or sleeping
 func (m *Manager) IsRunning() bool {
 	return m.chWork != nil
 }
@@ -120,6 +121,7 @@ Loop:
 func (m *Manager) Start() {
 	//resume if started
 	if m.IsStarted() {
+		m.isPaused = false
 		m.play()
 		return
 	}
@@ -162,10 +164,11 @@ func (m *Manager) Pause() {
 		m.timer.Stop()
 	}
 	m.chWork = nil
+	m.isPaused = true
+	m.currState = "Пауза"
 	m.mu.Unlock()
 
 	m.chControl <- struct{}{}
-	m.currState = "Пауза"
 }
 
 //play resume machine
@@ -217,6 +220,7 @@ func (m *Manager) Wait() {
 type ManagerInfo struct {
 	StateCaption  string  `json:"caption"`
 	IsRunning     bool    `json:"running"`
+	IsPaused      bool    `json:"paused"`
 	Threads       int     `json:"threads"`
 	OrderIds      string  `json:"ids"`
 	OrderCount    int     `json:"count"`
@@ -238,6 +242,7 @@ func (m *Manager) GetInfo() (info ManagerInfo) {
 	inf := ManagerInfo{
 		StateCaption:  m.currState,
 		IsRunning:     m.IsRunning(),
+		IsPaused:      m.isPaused,
 		Threads:       m.concurrency,
 		OrderIds:      strings.Join(ids[:], ","),
 		OrderCount:    len(ids),

@@ -146,7 +146,8 @@ func (b *basicRepository) StartOrders(ctx context.Context, source, group int, sk
 
 func (b *basicRepository) LoadOrder(ctx context.Context, id string) (cycle.Order, error) {
 	var res cycle.Order
-	ssql := "SELECT id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production FROM orders WHERE id = ?"
+	//ssql := "SELECT id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production FROM orders WHERE id = ?"
+	ssql := "SELECT id, source, src_id, src_date, state, state_date, group_id, ftp_folder, fotos_num, client_id, production FROM orders WHERE id = ?"
 	err := b.db.GetContext(ctx, &res, ssql, id)
 	return res, err
 }
@@ -189,7 +190,8 @@ func (b *basicRepository) GetGroupState(ctx context.Context, baseID string, sour
 
 func (b *basicRepository) LoadBaseOrderByState(ctx context.Context, source, state int) (cycle.Order, error) {
 	var res cycle.Order
-	ssql := "SELECT id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production FROM orders WHERE source = ? AND id LIKE '%@' AND state = ? LIMIT 1"
+	//ssql := "SELECT id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production FROM orders WHERE source = ? AND id LIKE '%@' AND state = ? LIMIT 1"
+	ssql := "SELECT id, source, src_id, src_date, state, state_date, group_id, ftp_folder, fotos_num, client_id, production FROM orders WHERE source = ? AND id LIKE '%@' AND state = ? LIMIT 1"
 	err := b.db.GetContext(ctx, &res, ssql, source, state)
 	return res, err
 }
@@ -197,7 +199,8 @@ func (b *basicRepository) LoadBaseOrderByState(ctx context.Context, source, stat
 func (b *basicRepository) LoadBaseOrderByChildState(ctx context.Context, source, baseState, childState int) ([]cycle.Order, error) {
 	res := []cycle.Order{}
 	var sb strings.Builder
-	sb.WriteString("SELECT o.id, o.source, o.src_id, o.src_date, o.data_ts, o.state, o.state_date, o.group_id, o.ftp_folder, o.fotos_num, o.client_id, o.production")
+	//sb.WriteString("SELECT o.id, o.source, o.src_id, o.src_date, o.data_ts, o.state, o.state_date, o.group_id, o.ftp_folder, o.fotos_num, o.client_id, o.production")
+	sb.WriteString("SELECT o.id, o.source, o.src_id, o.src_date, o.state, o.state_date, o.group_id, o.ftp_folder, o.fotos_num, o.client_id, o.production")
 	sb.WriteString(" FROM orders o")
 	sb.WriteString(" WHERE o.source = ? AND o.id LIKE '%@' AND o.state = ? AND EXISTS (SELECT 1 FROM orders o1 WHERE o1.group_id = o.group_id AND o1.state = ?)")
 	sql := sb.String()

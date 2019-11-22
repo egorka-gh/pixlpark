@@ -487,6 +487,7 @@ func (fc *baseFactory) fetchToTransform(t *Transform) stateFunc {
 		//wrong state in PP
 		//TODO reset in cycle ??
 		msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", t.ppOrder.Status, statePixelLoadStarted)
+		logger.Log("error", msg)
 		err = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
 		if err != nil {
 			t.err = ErrRepository{err}
