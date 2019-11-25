@@ -387,6 +387,12 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 			continue
 		}
 
+		//check download link
+		if po.DownloadLink == "" {
+			logger.Log("skip", "not ready or empty download url")
+			continue
+		}
+
 		//check states in cycle
 		ok := false
 		ok, inerErr = fc.checkCreateInCycle(t, co)
