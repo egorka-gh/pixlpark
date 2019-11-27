@@ -56,9 +56,14 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	token.SetAuthURLParametr(req2)
 	t.setModReq(req, req2)
 	res, err := t.base().RoundTrip(req2)
+	if err != nil {
+		t.Source.Reset()
+		reqBodyClosed = true
+		t.setModReq(req, nil)
+		return nil, err
+	}
 
-	//in case 401 respose reset t.Source and do trip again??
-	//TODO write test
+	//in case 401 respose reset t.Source and do trip again
 	if res.StatusCode == 401 {
 		t.Source.Reset()
 		token, err = t.Source.Token()
