@@ -374,6 +374,11 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 	for po, err = fc.queuePop(t.ctx, t.fetchState); err == nil; {
 		logger := log.With(t.logger, "order", po.ID)
 		logger.Log("fetch", "start")
+		if t.ppOrder.ID == po.ID {
+			//cycled pop???
+			err = fmt.Errorf("cycled fetch %s", po.ID)
+			break
+		}
 		t.ppOrder = po
 
 		co := fromPPOrder(po, fc.source, "@")
@@ -419,6 +424,7 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 
 	t.err = err
 	if err == nil {
+		//TODO never happend
 		//return last error
 		t.err = inerErr
 	}
@@ -455,10 +461,16 @@ func (fc *baseFactory) queuePop(ctx context.Context, state string) (pp.Order, er
 		return order, ErrEmptyQueue{fmt.Errorf("No orders in state %s", state)}
 	}
 	//pop last (first by date, GetOrders returns orders sorted by date DESC)
-	order = queue[len(queue)-1]
-	fc.queues[state] = queue[:len(queue)-1]
+	if len(queue) == 1 {
+		//next pop will be empty
+		order = queue[0]
+		fc.queues[state] = []pp.Order{}
+	} else {
+		order = queue[len(queue)-1]
+		fc.queues[state] = queue[:len(queue)-1]
+	}
 
-	return order, err
+	return order, nil
 }
 
 //fetchToTransform looks for in cycle orders whith not complited transform

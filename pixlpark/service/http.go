@@ -134,8 +134,8 @@ func decodeGetOrdersResponse(ctx context.Context, r *http1.Response) (interface{
 	if r.StatusCode != http1.StatusOK {
 		return nil, statusError(r.StatusCode)
 	}
-	var resp GetOrdersResponse
 	var err error
+	var resp GetOrdersResponse
 	if isDebugSet(ctx) {
 		var raw bytes.Buffer
 		tee := io.TeeReader(r.Body, &raw)

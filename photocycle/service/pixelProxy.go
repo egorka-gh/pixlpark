@@ -76,6 +76,12 @@ func createRouter(config *Config) *chi.Mux {
 			//r.Get("/status", SetOrderState)
 		})
 
+		r.Route("/orders/{state}", func(r chi.Router) {
+			//r.Use(OrderCtx)       // Load the *Order on the request context
+			r.Get("/", config.ListOrders)  // GET /orders/somestatus
+			r.Post("/", config.ListOrders) // Post /orders/somestatus
+		})
+
 		//get order and transform to MailPackage payload as it expect cycle
 		r.Route("/mailpackage/{orderID}", func(r chi.Router) {
 			r.Use(config.OrderCtx) // Load the *Order on the request context
@@ -157,7 +163,45 @@ func (c *Config) SetOrderState(w http.ResponseWriter, r *http.Request) {
 		render.Render(w, r, ErrRender(err))
 		return
 	}
+}
 
+//ListOrders redirects method to pixel api
+func (c *Config) ListOrders(w http.ResponseWriter, r *http.Request) {
+	if c.PixelClient == nil {
+		render.Render(w, r, ErrNotConfigured)
+		return
+	}
+
+	state := chi.URLParam(r, "state")
+	if state == "" {
+		render.Render(w, r, ErrNotFound)
+		return
+	}
+
+	//get orders count by state
+	cnt, err := c.PixelClient.CountOrders(r.Context(), []string{state})
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+
+	res := make([]OrderResponse, 0, cnt)
+	if cnt > 0 {
+		lst, err := c.PixelClient.GetOrders(r.Context(), state, 0, 0, cnt, 0)
+		//lst, err := c.PixelClient.GetOrders(r.Context(), state, 0, 0, 50, 0)
+		if err != nil {
+			render.Render(w, r, ErrInvalidRequest(err))
+			return
+		}
+		for _, o := range lst {
+			res = append(res, OrderResponse{ID: o.ID, State: o.Status})
+		}
+	}
+
+	if err := render.Render(w, r, &BaseResponse{Result: orders(res)}); err != nil {
+		render.Render(w, r, ErrRender(err))
+		return
+	}
 }
 
 // GetOrder returns the specific Order. It just
@@ -232,6 +276,12 @@ func (b *BaseResponse) Render(w http.ResponseWriter, r *http.Request) error {
 type message string
 
 func (m message) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+type orders []OrderResponse
+
+func (o orders) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 

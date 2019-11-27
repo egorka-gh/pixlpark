@@ -108,16 +108,38 @@ type GetOrdersResponse struct {
 
 // GetOrders implements Service. Primarily useful in a client.
 func (e Endpoints) GetOrders(ctx context.Context, status string, userID, shippingID, take, skip int) ([]Order, error) {
-	request := GetOrdersRequest{Take: take, Skip: skip, Status: status, UserID: userID, ShippingID: shippingID}
-	response, err := e.GetOrdersEndpoint(ctx, request)
-	if err != nil {
-		return []Order{}, err
+	if skip > 0 {
+		//hope you now what you are doing
+		request := GetOrdersRequest{Take: take, Skip: skip, Status: status, UserID: userID, ShippingID: shippingID}
+		response, err := e.GetOrdersEndpoint(ctx, request)
+		if err != nil {
+			return []Order{}, err
+		}
+		resp := response.(GetOrdersResponse)
+		if err = resp.check(); err != nil {
+			return []Order{}, err
+		}
+		return resp.Result, nil
 	}
-	resp := response.(GetOrdersResponse)
-	if err = resp.check(); err != nil {
-		return []Order{}, err
+	//take elements by chunks
+	//fuck buggy pixel
+	chunk := 50
+	chunks := 1 + (take-1)/chunk
+	orders := make([]Order, 0, take)
+	for i := 0; i < chunks; i++ {
+		//Skip: (i + 1) * chunk !! double fuck buggy pixel
+		request := GetOrdersRequest{Take: chunk, Skip: (i + 1) * chunk, Status: status, UserID: userID, ShippingID: shippingID}
+		response, err := e.GetOrdersEndpoint(ctx, request)
+		if err != nil {
+			return []Order{}, err
+		}
+		resp := response.(GetOrdersResponse)
+		if err = resp.check(); err != nil {
+			return []Order{}, err
+		}
+		orders = append(orders, resp.Result...)
 	}
-	return resp.Result, nil
+	return orders, nil
 }
 
 //*************** GetOrder
