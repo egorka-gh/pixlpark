@@ -73,7 +73,7 @@ func createRouter(config *Config) *chi.Mux {
 			r.With(config.OrderCtx).Post("/", GetOrder) // cycle allways uses Post, so route it as GET
 			r.Post("/status", config.SetOrderState)     //set order status, not PUT - cycle allways uses Post
 			//4 debug
-			//r.Get("/status", SetOrderState)
+			r.Get("/status/{status}", config.SetOrderState)
 		})
 
 		r.Route("/orders/{state}", func(r chi.Router) {
@@ -149,6 +149,9 @@ func (c *Config) SetOrderState(w http.ResponseWriter, r *http.Request) {
 	}
 	//parse status from post form
 	status := r.FormValue("status")
+	if status == "" && r.Method == http.MethodGet {
+		status = chi.URLParam(r, "status")
+	}
 	if status == "" {
 		render.Render(w, r, ErrNotFound)
 		return
