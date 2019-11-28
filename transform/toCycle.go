@@ -204,6 +204,19 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 		return ErrParce{err}
 	}
 
+	//compact, remove vs Process==false
+	lst := make([]fileCopy, 0, len(list))
+	for i := range list {
+		if list[i].Process {
+			lst = append(lst, list[i])
+		}
+	}
+	if len(lst) == 0 {
+		//empty order or parse error
+		return ErrParce{errors.New("Empty order or parse error")}
+	}
+	list = lst
+
 	//set book index
 	//TODO valid only for books, recheck for other products
 	if item.Quantity <= 1 {
@@ -217,8 +230,6 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 		fi.BookIdx = item.Quantity
 		list = append(list, fi)
 	}
-	//TODO check item.PageCount, don't forget added sheet if books > 1
-	//toProcess == item.PageCount
 
 	//check butt if 0 set by sku
 	butt := item.Sizes.Thickness
@@ -264,18 +275,8 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 	if err != nil {
 		return err
 	}
-
 	//update order
 	order.FotosNum = done
-	//?? factory has to do it
-	//order.State = pc.StateConfirmation
-	//order.StateDate = time.Now()
-	/*
-		default:
-			return fmt.Errorf("Неподдерживаемый тип %d алиаса '%s'", alias.Type, alias.Alias)
-		}
-	*/
-
 	return nil
 }
 

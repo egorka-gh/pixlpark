@@ -575,6 +575,67 @@ func (fc *baseFactory) doFinalize(t *Transform) stateFunc {
 	return fc.closeTransform
 }
 
+/*
+//doSyncCycle loads all orders in valid processing states older than 7days
+// checks state in PP
+// if state not Printing set Done or Canceled in cycle
+//bloks till process all
+//allways returns complited transform
+func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
+	//get order list from DB
+	orders, err := fc.pcClient.LoadBaseOrderByChildState(t.ctx, fc.source, pc.StateUnzip, pc.StateLoadComplite)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			t.err = ErrRepository{err}
+		} else {
+			t.err = ErrEmptyQueue{fmt.Errorf("No orders in cycle with appropriate states")}
+		}
+		return fc.closeTransform
+	}
+	//TODO continue on error?
+	for _, t.pcBaseOrder = range orders {
+		//check context canceled
+		if t.ctx.Err() != nil {
+			t.err = t.ctx.Err()
+			return fc.closeTransform
+		}
+		logger := log.With(t.logger, "order", t.pcBaseOrder.GroupID)
+		logger.Log("event", "start")
+
+		//load from PP
+		t.ppOrder, err = fc.ppClient.GetOrder(t.ctx, t.pcBaseOrder.SourceID)
+		if err != nil {
+			t.err = ErrService{err}
+			logger.Log("error", err.Error())
+			return fc.closeTransform
+		}
+		//check PP state
+		if t.ppOrder.Status != pp.StatePrinting {
+			//wrong state in PP
+			//TODO reset in cycle ??
+			msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", t.ppOrder.Status, pp.StatePrinting)
+			err = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
+			if err != nil {
+				t.err = ErrRepository{err}
+				logger.Log("error", err.Error())
+				return fc.closeTransform
+			}
+		}
+		//finalize
+		err = fc.finish(t, true)
+		if err != nil {
+			logger.Log("error", err.Error())
+			return fc.closeTransform
+		}
+		logger.Log("event", "end")
+	}
+
+	//complited
+	t.err = ErrEmptyQueue{fmt.Errorf("No orders in cycle with appropriate states")}
+	return fc.closeTransform
+}
+*/
+
 //start grab client to load zip
 //in/out states statePixelLoadStarted in PP and StateLoadWaite in cycle
 func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
