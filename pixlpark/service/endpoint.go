@@ -126,6 +126,7 @@ func (e Endpoints) GetOrders(ctx context.Context, status string, userID, shippin
 	chunk := 50
 	chunks := 1 + (take-1)/chunk
 	orders := make([]Order, 0, take)
+	added := make(map[string]bool)
 	for i := 0; i < chunks; i++ {
 		//Skip: (i + 1) * chunk !! double fuck buggy pixel
 		request := GetOrdersRequest{Take: chunk, Skip: (i + 1) * chunk, Status: status, UserID: userID, ShippingID: shippingID}
@@ -137,7 +138,16 @@ func (e Endpoints) GetOrders(ctx context.Context, status string, userID, shippin
 		if err = resp.check(); err != nil {
 			return []Order{}, err
 		}
-		orders = append(orders, resp.Result...)
+		//orders = append(orders, resp.Result...)
+		//while fetching, some order can be added (it will appear at top)
+		//as result we will have duplicated orders (end of last page will be at top of new page)
+		//so use map to check if order already added
+		for _, o := range resp.Result {
+			if added[o.ID] == false {
+				added[o.ID] = true
+				orders = append(orders, o)
+			}
+		}
 	}
 	return orders, nil
 }
