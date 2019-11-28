@@ -367,11 +367,14 @@ func (fc *baseFactory) run(t *Transform, f stateFunc) {
 //must check order state in cycle (not implemented)
 func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 	var err error
-	var inerErr error
-	var po pp.Order
+	//var inerErr error
 	t.logger.Log("fetchState", t.fetchState)
 
-	for po, err = fc.queuePop(t.ctx, t.fetchState); err == nil; {
+	for err == nil {
+		var po pp.Order
+		if po, err = fc.queuePop(t.ctx, t.fetchState); err != nil {
+			break
+		}
 		logger := log.With(t.logger, "order", po.ID)
 		logger.Log("fetch", "start")
 		if t.ppOrder.ID == po.ID {
@@ -380,7 +383,6 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 			break
 		}
 		t.ppOrder = po
-
 		co := fromPPOrder(po, fc.source, "@")
 		co.State = pc.StateLoadWaite
 
@@ -399,18 +401,17 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 		}
 
 		//check states in cycle
-		ok := false
-		ok, inerErr = fc.checkCreateInCycle(t, co)
-		if !ok && inerErr != nil {
+
+		if inerErr := fc.checkCreateInCycle(t, co); inerErr != nil {
 			logger.Log("skip", inerErr.Error())
 			continue
 		}
 		//move state in PP to statePixelLoadStarted
 		if t.fetchState != statePixelLoadStarted {
-			if inerErr = fc.setPixelState(t, statePixelLoadStarted, ""); inerErr != nil {
+			if inerErr := fc.setPixelState(t, statePixelLoadStarted, ""); inerErr != nil {
 				//keep fetching
 				logger.Log("skip", inerErr.Error())
-				inerErr = ErrService{inerErr}
+				//inerErr = ErrService{inerErr}
 				continue
 			}
 		}
@@ -423,12 +424,6 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 	}
 
 	t.err = err
-	if err == nil {
-		//TODO never happend
-		//return last error
-		t.err = inerErr
-	}
-
 	return fc.closeTransform
 }
 
@@ -900,35 +895,35 @@ func (fc *baseFactory) closeTransform(t *Transform) stateFunc {
 }
 
 //check states in cycle
-func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, err error) {
+func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) error {
 	//load/check state from all orders by group
 	states, err := fc.pcClient.GetGroupState(t.ctx, co.ID, fc.source, co.GroupID)
 	if err != nil {
 		//TODO database not responding??
 		err = ErrRepository{err}
 		//stop all?
-		return false, err
+		return err
 	}
 	if states.BaseState == 0 && states.ChildState == 0 {
 		//normal flow - create base
 		if err = fc.pcClient.CreateOrder(t.ctx, co); err != nil {
 			err = ErrRepository{err}
-			return false, err
+			return err
 		}
-		return true, nil
+		return nil
 	}
 
 	if states.BaseState == pc.StateCanceledPHCycle {
 		//cancel in pp
 		err = errors.New("Заказ отменен в PhotoCycle")
 		_ = fc.setPixelState(t, statePixelAbort, err.Error())
-		return false, err
+		return err
 	}
 	if states.ChildState > pc.StatePrintWaite {
 		//cancel in pp
 		err = errors.New("Запуск заказа отправленного на печать в PhotoCycle")
 		_ = fc.setPixelState(t, statePixelAbort, err.Error())
-		return false, err
+		return err
 	}
 
 	//check by fetch state
@@ -940,7 +935,7 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 			//skip
 			err = fmt.Errorf("Не соответствие статусов pixel:%s, cycle:StateUnzip", t.fetchState)
 			//_ = fc.setPixelState(t, "", err.Error())
-			return false, err
+			return err
 		}
 	}
 	/*
@@ -959,7 +954,7 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) (ok bool, e
 	if states.BaseState != co.State {
 		_ = fc.pcClient.SetOrderState(t.ctx, co.ID, co.State)
 	}
-	return true, nil
+	return nil
 }
 
 //finalize complete transform
