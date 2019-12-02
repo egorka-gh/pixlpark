@@ -175,6 +175,10 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 		return errCantTransform
 	}
 
+	if item.DirectoryName == "" {
+		return ErrParce{errors.New("Не указана папка в zip (item.DirectoryName)")}
+	}
+
 	alias, err := fc.pcClient.LoadAlias(ctx, a)
 	if err != nil {
 		if err == sql.ErrNoRows {
