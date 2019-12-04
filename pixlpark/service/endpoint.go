@@ -129,7 +129,7 @@ func (e Endpoints) GetOrders(ctx context.Context, status string, userID, shippin
 	added := make(map[string]bool)
 	for i := 0; i < chunks; i++ {
 		//Skip: (i + 1) * chunk !! double fuck buggy pixel
-		request := GetOrdersRequest{Take: chunk, Skip: (i + 1) * chunk, Status: status, UserID: userID, ShippingID: shippingID}
+		request := GetOrdersRequest{Take: chunk, Skip: i * chunk, Status: status, UserID: userID, ShippingID: shippingID}
 		response, err := e.GetOrdersEndpoint(ctx, request)
 		if err != nil {
 			return []Order{}, err
