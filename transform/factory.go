@@ -362,7 +362,7 @@ func (fc *baseFactory) run(t *Transform, f stateFunc) {
 //bloks till get some order to process
 //on success t is not closed (valid for processing)
 //if there is no orders returns ErrEmptyQueue
-//fetch in PP state statePixelStartLoad or statePixelLoadStarted
+//fetch in PP state statePixelStartLoad or statePixelLoadStarted (restart after soft error or srvice stop)
 //fetched order moves to statePixelLoadStarted in PP and to StateLoadWaite in cycle
 //must check order state in cycle (not implemented)
 func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
@@ -974,6 +974,7 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) error {
 		return nil
 	}
 
+	/* no sence, it is notpossible to move state back in frontend
 	if states.BaseState == pc.StateCanceledPHCycle {
 		//cancel in pp
 		err = errors.New("Заказ отменен в PhotoCycle")
@@ -986,6 +987,7 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) error {
 		_ = fc.setPixelState(t, statePixelAbort, err.Error())
 		return err
 	}
+	*/
 
 	//check by fetch state
 	//statePixelLoadStarted
