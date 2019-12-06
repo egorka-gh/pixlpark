@@ -850,13 +850,13 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		//try build by alias
 		//intermediate state for buld by alias (then forward to StatePreprocessWaite)
 		co.State = pc.StateLoadComplite
-		err = fc.transformAlias(t.ctx, item, &co)
+		err = fc.transformAlias(t.ctx, &item, &co)
 		if _, ok := err.(ErrCantTransform); ok == true {
 			//try build photo print
 			//intermediate state for buld photo (then forward to StatePrintWaite)
 			isPhoto = true
 			co.State = pc.StatePreprocessComplite
-			err = fc.transformPhoto(t.ctx, item, &co)
+			err = fc.transformPhoto(t.ctx, &item, &co)
 		}
 		if err != nil {
 			incomlete = true

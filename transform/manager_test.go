@@ -84,6 +84,10 @@ func (f *testFactory) SoftErrorRestart(ctx context.Context) *Transform {
 func (f *testFactory) SetDebug(debug bool) {
 	//noop
 }
+func (f *testFactory) QueueLen() int {
+	//noop
+	return 0
+}
 
 func createFactory(callsPerCycle, cycles int32, counter chan<- int) (Factory, chan struct{}) {
 	done := make(chan struct{})

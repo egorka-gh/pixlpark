@@ -20,7 +20,7 @@ import (
 //can't detect exactly if item is photo product
 //if something goes wrong just says errCantTransform
 //TODO add alias to mark photo products?
-func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, order *pc.Order) error {
+func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, order *pc.Order) error {
 	p, ok := item.Sku()["paper"]
 	if !ok || p == "" {
 		return errCantTransform
@@ -168,7 +168,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item pp.OrderItem, or
 	return nil
 }
 
-func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, order *pc.Order) error {
+func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, order *pc.Order) error {
 	//try build by alias
 	a, ok := item.Sku()["alias"]
 	if !ok || a == "" {
@@ -203,7 +203,23 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 		return ErrSourceNotFound{fmt.Errorf("Empty folder '%s'", basePath)}
 	}
 
-	err = listIndexSheets(list, alias.HasCover)
+	//check maket
+	var pages int
+	isMaket := false
+	pagesStr, ok := item.Sku()["maket"]
+	if ok && pagesStr != "" {
+		isMaket = true
+		if pages, err = strconv.Atoi(pagesStr); err != nil {
+			return ErrParce{fmt.Errorf("Неверный формат SKU maket, ожидалось число разворотов. Ошибка:'%s'", err)}
+		}
+		if (pages) != item.PageCount {
+			return ErrParce{errors.New("Количество разворотов заказа не соответствует значению SKU maket")}
+		}
+		//add cover
+		item.PageCount++
+	}
+
+	err = listIndexSheets(list, alias.HasCover, isMaket)
 	if err != nil {
 		return ErrParce{err}
 	}
@@ -331,6 +347,7 @@ func buildExtraInfo(forOrder pc.Order, from pp.OrderItem) pc.OrderExtraInfo {
 		CornerType:    from.Sku()["corner_type"],
 		Kaptal:        from.Sku()["kaptal"],
 		CoverMaterial: from.Sku()["cover_material"],
+		Weight:        int(math.Round(from.TotalWeight)),
 	}
 
 	//translate paper id
@@ -383,15 +400,31 @@ func fillList(path string, qtty int) ([]fileCopy, error) {
 	return res, nil
 }
 
-func listIndexSheets(list []fileCopy, hasCover bool) error {
+func listIndexSheets(list []fileCopy, hasCover, isMaket bool) error {
 	rep, err := regexp.Compile(`(_preview\.)`)
 	if err != nil {
 		return err
 	}
-	//fmt.Println(re.MatchString("surface_0_preview.png"))
-	rei, err := regexp.Compile(`^surface_\[(\d+)\]`)
-	if err != nil {
-		return err
+	var rei *regexp.Regexp
+	var rec *regexp.Regexp
+	if isMaket == false {
+		//fmt.Println(re.MatchString("surface_0_preview.png"))
+		rei, err = regexp.Compile(`^surface_\[(\d+)\]`)
+		if err != nil {
+			return err
+		}
+	} else {
+		//cover_1-(kreshhenie-kirill_11).jpg
+		rec, err = regexp.Compile(`^cover_(\d+)`)
+		if err != nil {
+			return err
+		}
+		//page_6-(kreshhenie-kirill_06).jpg
+		rei, err = regexp.Compile(`^page_(\d+)`)
+		if err != nil {
+			return err
+		}
+
 	}
 	//m :=re.FindStringSubmatch("surface_[78888](oblozhka)_zone_[0](oblozhka).jpg")
 
@@ -401,17 +434,28 @@ func listIndexSheets(list []fileCopy, hasCover bool) error {
 				//exclude preview
 				list[i].Process = false
 			} else {
-				//get surface index
+				//check if cover for maket
+				if rec != nil {
+					sm := rec.FindStringSubmatch(fi.OldName)
+					if len(sm) > 0 {
+						//cover
+						//TODO valid while it is only one cover
+						list[i].SheetIdx = 0
+						continue
+					}
+				}
+
+				//get surface or page index
 				sm := rei.FindStringSubmatch(fi.OldName)
 				if len(sm) != 2 {
-					//TODO error?
 					list[i].Process = false
 				} else {
 					idx, err := strconv.Atoi(sm[1])
 					if err != nil {
 						return err
 					}
-					if !hasCover {
+					if !hasCover && !isMaket {
+						//TODO not shure about idx
 						idx++
 					}
 					list[i].SheetIdx = idx

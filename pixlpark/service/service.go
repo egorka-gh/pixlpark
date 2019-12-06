@@ -151,6 +151,7 @@ type OrderItem struct {
 	DirectoryName    string            `json:"DirectoryName"`
 	Comment          string            `json:"Comment"`
 	Sizes            OrderItemSizes    `json:"EditorOutput"`
+	TotalWeight      float64           `json:"TotalWeight"`
 	skuMap           map[string]string
 }
 
