@@ -219,6 +219,11 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item pp.OrderItem, or
 		//empty order or parse error
 		return ErrParce{errors.New("Empty order or parse error")}
 	}
+	if len(lst) != item.PageCount {
+		//empty order or parse error
+		//TODO Fatal?? pixel cann't rebuild zip
+		return ErrParce{errors.New("Wrong page count or parse error")}
+	}
 	list = lst
 
 	//set book index
