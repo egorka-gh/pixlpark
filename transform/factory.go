@@ -1050,9 +1050,13 @@ func (fc *baseFactory) finish(t *Transform, restarted bool) (err error) {
 	fc.setCycleState(t, pc.StateSkiped, pc.StateTransform, "complete")
 
 	//kill zip and unziped folder
-	if !fc.Debug {
-		os.Remove(filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip"))
-		os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID))
+	if fc.Debug == false {
+		if err = os.Remove(filepath.Join(fc.wrkFolder, t.ppOrder.ID+".zip")); err != nil {
+			t.logger.Log("warning", fmt.Sprintf("Cleanup error:%s", err.Error()))
+		}
+		if err = os.RemoveAll(path.Join(fc.wrkFolder, t.ppOrder.ID)); err != nil {
+			t.logger.Log("warning", fmt.Sprintf("Cleanup error:%s", err.Error()))
+		}
 	}
 	return nil
 }
