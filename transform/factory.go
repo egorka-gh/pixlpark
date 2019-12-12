@@ -712,6 +712,7 @@ func (fc *baseFactory) unzip(t *Transform) stateFunc {
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrZip, t.err.Error())
 		return fc.closeTransform
 	}
+	defer reader.Close()
 	basePath := path.Join(fc.wrkFolder, t.ppOrder.ID)
 	if err = os.MkdirAll(basePath, 0755); err != nil {
 		logger.Log("error", err.Error())
