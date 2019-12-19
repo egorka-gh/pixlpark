@@ -23,6 +23,7 @@ type Repository interface {
 	FillOrders(ctx context.Context, orders []Order) error
 	StartOrders(ctx context.Context, source, group int, skipID string) error
 	CountCurrentOrders(ctx context.Context, source int) (int, error)
+	GetCurrentOrders(ctx context.Context, source int) ([]GroupState, error)
 	Close()
 }
 
@@ -59,8 +60,10 @@ type Order struct {
 
 //GroupState is dto for orders states by GroupID
 type GroupState struct {
-	BaseState  int `json:"basestate" db:"basestate"`
-	ChildState int `json:"childstate" db:"childstate"`
+	GroupID    int       `json:"group_id" db:"group_id"`
+	BaseState  int       `json:"basestate" db:"basestate"`
+	ChildState int       `json:"childstate" db:"childstate"`
+	StateDate  time.Time `json:"state_date" db:"state_date"`
 }
 
 //OrderExtraInfo represents the OrderExtraInfo of db object

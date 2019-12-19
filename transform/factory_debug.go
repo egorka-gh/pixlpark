@@ -86,7 +86,7 @@ func (fc *baseFactory) getOrder(t *Transform) stateFunc {
 		t.err = ErrService{err}
 		return fc.closeTransform
 	}
-	co := fromPPOrder(po, fc.source, "@")
+	co := fromPPOrder(&po, fc.source, "@")
 	co.State = pc.StateLoadWaite
 	//try to create
 	fc.pcClient.CreateOrder(t.ctx, co)
@@ -124,7 +124,7 @@ func (fc *baseFactory) resetFetched(t *Transform) stateFunc {
 		doFetch = len(orders) > 0
 		for _, po := range orders {
 			fc.logger.Log("resetFetched", po.ID)
-			co := fromPPOrder(po, fc.source, "@")
+			co := fromPPOrder(&po, fc.source, "@")
 
 			//TODO load/check state from all orders by group?
 			if co.State == pc.StateCanceledPHCycle {

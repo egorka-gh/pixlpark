@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -320,6 +321,39 @@ func (fc *baseFactory) FinalizeRestart(ctx context.Context) *Transform {
 	return t
 }
 
+//SyncCycle checks current cycle orders for ones is canceled in pixel
+// loads orders form cycle in working states && check if canceled in pixel
+// behavior is different
+// allways returns complited transform
+// do all in one step
+func (fc *baseFactory) SyncCycle(ctx context.Context) *Transform {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	t := &Transform{
+		fetchState: pp.StateCancelled,
+		Start:      time.Now(),
+		Done:       make(chan struct{}, 0),
+		ctx:        ctx,
+		cancel:     cancel,
+		logger:     log.With(fc.logger, "sequence", "SyncCycle"),
+	}
+
+	t.logger.Log("event", "start")
+	fc.run(t, fc.doSyncCycle)
+	if t.IsComplete() {
+		//complited
+		t.logger.Log("event", "end", "error", t.Err().Error())
+		return t
+	}
+
+	//must never happend
+	t.logger.Log("event", "end", "error", "Got incompleted transform")
+	fc.run(t, fc.closeTransform)
+	return t
+}
+
 //QueueLen returns current queues lenth
 func (fc *baseFactory) QueueLen() int {
 	var res int
@@ -383,7 +417,7 @@ func (fc *baseFactory) fetchToLoad(t *Transform) stateFunc {
 			break
 		}
 		t.ppOrder = po
-		co := fromPPOrder(po, fc.source, "@")
+		co := fromPPOrder(&po, fc.source, "@")
 		co.State = pc.StateLoadWaite
 
 		//check production
@@ -575,15 +609,15 @@ func (fc *baseFactory) doFinalize(t *Transform) stateFunc {
 	return fc.closeTransform
 }
 
-/*
-//doSyncCycle loads all orders in valid processing states older than 7days
+//doSyncCanceled loads all orders in valid processing states
 // checks state in PP
-// if state not Printing set Done or Canceled in cycle
+//if state Canceled cancel in cycle
+// TODO if state not Printing set Done or Canceled in cycle
 //bloks till process all
 //allways returns complited transform
 func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
 	//get order list from DB
-	orders, err := fc.pcClient.LoadBaseOrderByChildState(t.ctx, fc.source, pc.StateUnzip, pc.StateLoadComplite)
+	grps, err := fc.pcClient.GetCurrentOrders(t.ctx, fc.source)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			t.err = ErrRepository{err}
@@ -593,39 +627,54 @@ func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
 		return fc.closeTransform
 	}
 	//TODO continue on error?
-	for _, t.pcBaseOrder = range orders {
+	for i := range grps {
 		//check context canceled
 		if t.ctx.Err() != nil {
 			t.err = t.ctx.Err()
 			return fc.closeTransform
 		}
-		logger := log.With(t.logger, "order", t.pcBaseOrder.GroupID)
+		intID := grps[i].GroupID
+		id := strconv.Itoa(intID)
+		logger := log.With(t.logger, "order", intID)
 		logger.Log("event", "start")
 
 		//load from PP
-		t.ppOrder, err = fc.ppClient.GetOrder(t.ctx, t.pcBaseOrder.SourceID)
+		ppOrder, err := fc.ppClient.GetOrder(t.ctx, id)
 		if err != nil {
 			t.err = ErrService{err}
 			logger.Log("error", err.Error())
 			return fc.closeTransform
 		}
-		//check PP state
-		if t.ppOrder.Status != pp.StatePrinting {
-			//wrong state in PP
-			//TODO reset in cycle ??
-			msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", t.ppOrder.Status, pp.StatePrinting)
-			err = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrPreprocess, msg)
+		//check if canceled
+		pcOrder := fromPPOrder(&ppOrder, fc.source, "@")
+		newState := 0
+		if ppOrder.Status == pp.StateCancelled {
+			//cancel in cycle
+			logger.Log("event", "Canceled")
+			fc.pcClient.LogState(t.ctx, pcOrder.ID, pc.StateCanceled, "Canceled by site")
+			newState = pc.StateCanceled
+		} else if ppOrder.Status != pp.StatePrinting {
+			msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", ppOrder.Status, pp.StatePrinting)
+			logger.Log("warning", msg)
+			fc.pcClient.LogState(t.ctx, pcOrder.ID, pc.StateSkiped, msg)
+			if time.Since(grps[i].StateDate).Hours() > 24*30 {
+				//state not changed more then 30 days
+				newState = pc.StateCanceled
+				if grps[i].ChildState >= 449 {
+					newState = pc.StateSend
+				}
+				msg = "Forvard state (order date expiry)"
+				logger.Log("event", msg)
+				fc.pcClient.LogState(t.ctx, pcOrder.ID, newState, msg)
+			}
+		}
+		if newState > 0 {
+			err = fc.pcClient.SetGroupState(t.ctx, fc.source, newState, intID, "")
 			if err != nil {
 				t.err = ErrRepository{err}
 				logger.Log("error", err.Error())
 				return fc.closeTransform
 			}
-		}
-		//finalize
-		err = fc.finish(t, true)
-		if err != nil {
-			logger.Log("error", err.Error())
-			return fc.closeTransform
 		}
 		logger.Log("event", "end")
 	}
@@ -634,7 +683,6 @@ func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
 	t.err = ErrEmptyQueue{fmt.Errorf("No orders in cycle with appropriate states")}
 	return fc.closeTransform
 }
-*/
 
 //start grab client to load zip
 //in/out states statePixelLoadStarted in PP and StateLoadWaite in cycle
@@ -844,7 +892,7 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		l := log.With(logger, "item", item.ID)
 		l.Log("transform", "start")
 		//create cycle order
-		co := fromPPOrder(t.ppOrder, fc.source, fmt.Sprintf("-%d", i))
+		co := fromPPOrder(&t.ppOrder, fc.source, fmt.Sprintf("-%d", i))
 		co.SourceID = fmt.Sprintf("%s-%d", t.ppOrder.ID, item.ID)
 
 		isPhoto := false

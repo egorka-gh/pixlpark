@@ -306,7 +306,7 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 }
 
 //FromPPOrder converts PP order to photocycle order
-func fromPPOrder(o pp.Order, source int, sufix string) pc.Order {
+func fromPPOrder(o *pp.Order, source int, sufix string) pc.Order {
 	g, err := strconv.Atoi(o.ID)
 	if err != nil {
 		g = 0

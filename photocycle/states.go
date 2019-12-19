@@ -140,7 +140,10 @@ const (
 	//449	Ожидает ОТК
 	//450	ОТК
 	//460	Упаковка
-	//465	Отправлен
+
+	//StateSend represent photocycle state
+	StateSend = 465 //465	Отправлен
+
 	//466	Отправлен (сайт)
 
 	//StateCanceledWeb represent photocycle state

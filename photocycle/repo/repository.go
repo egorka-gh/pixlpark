@@ -183,7 +183,7 @@ func (b *basicRepository) AddExtraInfo(ctx context.Context, ei cycle.OrderExtraI
 
 func (b *basicRepository) GetGroupState(ctx context.Context, baseID string, source, group int) (cycle.GroupState, error) {
 	var res cycle.GroupState
-	sql := "SELECT IFNULL(MAX(IF(o.id = ?, o.state, 0)), 0) basestate, IFNULL(MAX(IF(o.id = ?, 0, o.state)), 0) childstate FROM orders o WHERE o.source = ? AND o.group_id = ?"
+	sql := "SELECT o.group_id, IFNULL(MAX(IF(o.id = ?, o.state, 0)), 0) basestate, IFNULL(MAX(IF(o.id = ?, 0, o.state)), 0) childstate, NOW() state_date FROM orders o WHERE o.source = ? AND o.group_id = ?"
 	err := b.db.GetContext(ctx, &res, sql, baseID, baseID, source, group)
 	return res, err
 }
@@ -213,5 +213,17 @@ func (b *basicRepository) CountCurrentOrders(ctx context.Context, source int) (i
 	var res int
 	sql := "SELECT COUNT(DISTINCT o.group_id) FROM orders o WHERE o.state BETWEEN 100 AND 450 AND o.source = ?"
 	err := b.db.GetContext(ctx, &res, sql, source)
+	return res, err
+}
+
+func (b *basicRepository) GetCurrentOrders(ctx context.Context, source int) ([]cycle.GroupState, error) {
+	res := []cycle.GroupState{}
+	var sb strings.Builder
+	sb.WriteString("SELECT o.group_id, MAX(o.state) basestate, MIN(o.state) childstate, MAX(o.state_date) state_date")
+	sb.WriteString(" FROM orders o")
+	sb.WriteString(" WHERE o.state BETWEEN 100 AND 450 AND o.source = ?")
+	sb.WriteString(" GROUP BY o.group_id")
+	sql := sb.String()
+	err := b.db.SelectContext(ctx, &res, sql, source)
 	return res, err
 }
