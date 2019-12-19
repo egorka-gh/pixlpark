@@ -286,6 +286,13 @@ func (m *Manager) doWork(ctx context.Context) {
 		m.logNotNilErr("LoadRestart", err, ctx.Err())
 		return
 	}
+	//sync cycle vs pixel
+	m.currState = "Синхронизация статусов"
+	err = m.runQueue(ctx, m.factory.SyncCycle, false)
+	if err != nil || ctx.Err() != nil {
+		m.logNotNilErr("SyncCycle", err, ctx.Err())
+		return
+	}
 
 	/*
 		//restart after soft error

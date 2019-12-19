@@ -35,6 +35,8 @@ type Factory interface {
 	TransformRestart(ctx context.Context) *Transform
 	//FinalizeRestart updates states for complited transforms
 	FinalizeRestart(ctx context.Context) *Transform
+	//SyncCycle checks current cycle orders if some are canceled or not in print state in pixel
+	SyncCycle(ctx context.Context) *Transform
 
 	// DoOrder loads order and perfom full trunsform (4 tests only)
 	DoOrder(ctx context.Context, id string) *Transform
@@ -279,8 +281,8 @@ func (fc *baseFactory) FinalizeRestart(ctx context.Context) *Transform {
 	return t
 }
 
-//SyncCycle checks current cycle orders for ones is canceled in pixel
-// loads orders form cycle in working states && check if canceled in pixel
+//SyncCycle checks current cycle orders if some are canceled or not in print state in pixel
+// loads orders form cycle in working states && check state in pixel
 // behavior is different
 // allways returns complited transform
 // do all in one step
@@ -568,9 +570,9 @@ func (fc *baseFactory) doFinalize(t *Transform) stateFunc {
 }
 
 //doSyncCanceled loads all orders in valid processing states
-// checks state in PP
+// checks state in pixel
 //if state Canceled cancel in cycle
-// TODO if state not Printing set Done or Canceled in cycle
+//if state not Printing set Done or Canceled in cycle (after 30 days)
 //bloks till process all
 //allways returns complited transform
 func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
@@ -793,8 +795,8 @@ func (fc *baseFactory) unzip(t *Transform) stateFunc {
 	}
 
 	//move to StateUnzip in cycle (to resume from transform)
-	_ = fc.setCycleState(t, pc.StateUnzip, pc.StateUnzip, fmt.Sprintf("complete elapsed=%s", time.Since(started).String()))
-	logger.Log("event", "end", "elapsed", time.Since(t.Start).String())
+	_ = fc.setCycleState(t, pc.StateUnzip, pc.StateUnzip, fmt.Sprintf("complete time=%s", time.Since(started).String()))
+	logger.Log("event", "end", "time", time.Since(started).String())
 	//forvard to transform
 	return fc.transformItems
 }

@@ -60,6 +60,7 @@ type testFactory struct {
 	transformRestart provider
 	finalizeRestart  provider
 	softErrorRestart provider
+	sync             provider
 	doOrder          provider
 }
 
@@ -81,6 +82,9 @@ func (f *testFactory) DoOrder(ctx context.Context, notused string) *Transform {
 func (f *testFactory) SoftErrorRestart(ctx context.Context) *Transform {
 	return f.softErrorRestart(ctx)
 }
+func (f *testFactory) SyncCycle(ctx context.Context) *Transform {
+	return f.sync(ctx)
+}
 func (f *testFactory) SetDebug(debug bool) {
 	//noop
 }
@@ -99,6 +103,7 @@ func createFactory(callsPerCycle, cycles int32, counter chan<- int) (Factory, ch
 		transformRestart: createProvider("TransformRestart", callsPerCycle, chCnt),
 		finalizeRestart:  createProvider("FinalizeRestart", callsPerCycle, chCnt),
 		softErrorRestart: createProvider("SoftErrorRestart", callsPerCycle, chCnt),
+		sync:             createProvider("SyncCycle", callsPerCycle, chCnt),
 		doOrder:          createProvider("DoOrder", callsPerCycle, chCnt),
 	}
 
