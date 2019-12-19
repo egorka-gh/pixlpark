@@ -214,48 +214,6 @@ func (fc *baseFactory) LoadRestart(ctx context.Context) *Transform {
 	return t
 }
 
-/*
-//SoftErrorRestart reload orders in state statePixelConfirmed
-// orders that allready started and has some reparable error (now orders that not transformed - unknown product)
-// behavior same as LoadNew exepct fetch orders in state statePixelConfirmed
-// resumes processing from transformItems
-// get ordrers vs statePixelConfirmed in PP, expected state in cycle StateUnzip (expect but not check)
-//TODO buggi state seq
-//либо рестартовать чз statePixelLoadStarted, либо переставить statePixelConfirmed и statePixelConfirmed
-func (fc *baseFactory) SoftErrorRestart(ctx context.Context) *Transform {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	t := &Transform{
-		fetchState: statePixelConfirmed,
-		Start:      time.Now(),
-		Done:       make(chan struct{}, 0),
-		ctx:        ctx,
-		cancel:     cancel,
-		logger:     log.With(fc.logger, "sequence", "SoftErrorRestart"),
-	}
-
-	// Run state-machine while caller is blocked to fetch pixelpark order and to initialize transform.
-	t.logger.Log("event", "start")
-	fc.run(t, fc.fetchToLoad)
-	if t.IsComplete() {
-		if t.Err() != nil {
-			t.logger.Log("event", "end", "error", t.Err().Error())
-		} else {
-			//panic??
-			t.logger.Log("event", "end", "error", "complited fetch must return error")
-		}
-		return t
-	}
-
-	//Run transform in a new goroutine
-	go fc.run(t, fc.transformItems)
-
-	return t
-}
-*/
-
 //TransformRestart restart incompleted transforms
 // orders that loaded and unziped but not complete for some reason (service stop or some error while transform)
 // behavior same as LoadNew exepct fetch orders method
@@ -311,7 +269,7 @@ func (fc *baseFactory) FinalizeRestart(ctx context.Context) *Transform {
 	fc.run(t, fc.doFinalize)
 	if t.IsComplete() {
 		//complited
-		t.logger.Log("event", "end", "error", t.Err().Error())
+		t.logger.Log("event", "end", "elapsed", time.Since(t.Start).String(), "error", t.Err().Error())
 		return t
 	}
 
@@ -344,7 +302,7 @@ func (fc *baseFactory) SyncCycle(ctx context.Context) *Transform {
 	fc.run(t, fc.doSyncCycle)
 	if t.IsComplete() {
 		//complited
-		t.logger.Log("event", "end", "error", t.Err().Error())
+		t.logger.Log("event", "end", "elapsed", time.Since(t.Start).String(), "error", t.Err().Error())
 		return t
 	}
 
@@ -733,7 +691,7 @@ func (fc *baseFactory) loadZIP(t *Transform) stateFunc {
 		_ = fc.setCycleState(t, pc.StateLoadWaite, pc.StateErrWeb, t.err.Error())
 		return fc.closeTransform
 	}
-	logger.Log("event", "end")
+	logger.Log("event", "end", "elapsed", time.Since(t.Start).String())
 	//don't change cycle state just log
 	_ = fc.setCycleState(t, 0, pc.StateLoadComplite, fmt.Sprintf("zip loaded elapsed=%s; speed=%.2f mb/s", t.loader.Duration().String(), t.loader.BytesPerSecond()/(1024*1024)))
 	//still in LoadWaie in cycle
@@ -836,7 +794,7 @@ func (fc *baseFactory) unzip(t *Transform) stateFunc {
 
 	//move to StateUnzip in cycle (to resume from transform)
 	_ = fc.setCycleState(t, pc.StateUnzip, pc.StateUnzip, fmt.Sprintf("complete elapsed=%s", time.Since(started).String()))
-	logger.Log("event", "end")
+	logger.Log("event", "end", "elapsed", time.Since(t.Start).String())
 	//forvard to transform
 	return fc.transformItems
 }
@@ -1073,7 +1031,7 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) error {
 func (fc *baseFactory) finish(t *Transform, restarted bool) (err error) {
 	defer func() {
 		if err != nil {
-			t.logger.Log("stage", "finish", "error", err.Error())
+			t.logger.Log("stage", "finish", "elapsed", time.Since(t.Start).String(), "error", err.Error())
 		}
 	}()
 
@@ -1096,7 +1054,7 @@ func (fc *baseFactory) finish(t *Transform, restarted bool) (err error) {
 	}
 
 	//move main to complite state
-	fc.setCycleState(t, pc.StateSkiped, pc.StateTransform, "complete")
+	fc.setCycleState(t, pc.StateSkiped, pc.StateTransform, fmt.Sprintf("complete, elapsed:%s", time.Since(t.Start).String()))
 
 	//kill zip and unziped folder
 	if fc.Debug == false {
