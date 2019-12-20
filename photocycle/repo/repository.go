@@ -183,7 +183,7 @@ func (b *basicRepository) AddExtraInfo(ctx context.Context, ei cycle.OrderExtraI
 
 func (b *basicRepository) GetGroupState(ctx context.Context, baseID string, source, group int) (cycle.GroupState, error) {
 	var res cycle.GroupState
-	sql := "SELECT o.group_id, IFNULL(MAX(IF(o.id = ?, o.state, 0)), 0) basestate, IFNULL(MAX(IF(o.id = ?, 0, o.state)), 0) childstate, NOW() state_date FROM orders o WHERE o.source = ? AND o.group_id = ?"
+	sql := "SELECT IFNULL(o.group_id, 0) group_id, IFNULL(MAX(IF(o.id = ?, o.state, 0)), 0) basestate, IFNULL(MAX(IF(o.id = ?, 0, o.state)), 0) childstate, NOW() state_date FROM orders o WHERE o.source = ? AND o.group_id = ?"
 	err := b.db.GetContext(ctx, &res, sql, baseID, baseID, source, group)
 	return res, err
 }
