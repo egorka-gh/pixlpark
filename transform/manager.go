@@ -47,6 +47,9 @@ type Manager struct {
 	wg     sync.WaitGroup
 	cancel context.CancelFunc
 
+	//last time run for daily tasks
+	dailyTasksTime time.Time
+
 	//current transforms
 	mu         sync.Mutex            // guards transforms
 	transforms map[string]*Transform // ID -> transform
@@ -286,23 +289,18 @@ func (m *Manager) doWork(ctx context.Context) {
 		m.logNotNilErr("LoadRestart", err, ctx.Err())
 		return
 	}
-	//sync cycle vs pixel
-	m.currState = "Синхронизация статусов"
-	err = m.runQueue(ctx, m.factory.SyncCycle, false)
-	if err != nil || ctx.Err() != nil {
-		m.logNotNilErr("SyncCycle", err, ctx.Err())
-		return
-	}
 
-	/*
-		//restart after soft error
-		m.currState = "Перезапуск подтвержденных ошибок"
-		err = m.runQueue(ctx, m.factory.SoftErrorRestart, true)
+	//daily tasks
+	if m.dailyTasksTime.IsZero() || time.Since(m.dailyTasksTime).Hours() > 24 {
+		m.dailyTasksTime = time.Now()
+		//sync cycle vs pixel
+		m.currState = "Синхронизация статусов"
+		err = m.runQueue(ctx, m.factory.SyncCycle, false)
 		if err != nil || ctx.Err() != nil {
-			m.logNotNilErr("LoadRestart", err, ctx.Err())
+			m.logNotNilErr("SyncCycle", err, ctx.Err())
 			return
 		}
-	*/
+	}
 
 	m.currState = "Ожидание"
 }

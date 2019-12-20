@@ -281,11 +281,11 @@ func (fc *baseFactory) FinalizeRestart(ctx context.Context) *Transform {
 	return t
 }
 
-//SyncCycle checks current cycle orders if some are canceled or not in print state in pixel
-// loads orders form cycle in working states && check state in pixel
-// behavior is different
+//SyncCycle checks current cycle orders if some are canceled or not in print state in pixel.
+// loads orders form cycle in working states & checks state in pixel.
+// behavior is differ from Load:
+// do all in one step,
 // allways returns complited transform
-// do all in one step
 func (fc *baseFactory) SyncCycle(ctx context.Context) *Transform {
 	if ctx == nil {
 		ctx = context.Background()
@@ -596,7 +596,7 @@ func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
 		intID := grps[i].GroupID
 		id := strconv.Itoa(intID)
 		logger := log.With(t.logger, "order", intID)
-		logger.Log("event", "start")
+		//logger.Log("event", "start")
 
 		//load from PP
 		ppOrder, err := fc.ppClient.GetOrder(t.ctx, id)
@@ -636,7 +636,7 @@ func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
 				return fc.closeTransform
 			}
 		}
-		logger.Log("event", "end")
+		//logger.Log("event", "end")
 	}
 
 	//complited
