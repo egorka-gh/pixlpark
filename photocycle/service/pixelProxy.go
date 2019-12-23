@@ -102,7 +102,8 @@ func createRouter(config *Config) *chi.Mux {
 
 	})
 	//mount net/http/pprof
-	r.Mount("/debug", middleware.Profiler())
+	//closed to check mem grow
+	//r.Mount("/debug", middleware.Profiler())
 	return r
 }
 

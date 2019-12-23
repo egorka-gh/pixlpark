@@ -482,6 +482,15 @@ func (fc *baseFactory) fetchToTransform(t *Transform) stateFunc {
 	logger := log.With(t.logger, "order", t.pcBaseOrder.GroupID)
 	logger.Log("event", "start")
 
+	//change state in cycle, to prevent cycled fetch
+	//if some err - should be reloaded vs LoadRestart
+	err = fc.setCycleState(t, pc.StateLoadWaite, 0, "")
+	if err != nil {
+		t.err = ErrRepository{err}
+		logger.Log("error", err.Error())
+		return fc.closeTransform
+	}
+
 	//load from PP
 	t.ppOrder, err = fc.ppClient.GetOrder(t.ctx, t.pcBaseOrder.SourceID)
 	if err != nil {
@@ -556,9 +565,9 @@ func (fc *baseFactory) doFinalize(t *Transform) stateFunc {
 			}
 		}
 		//finalize
+		t.logger = logger
 		err = fc.finish(t, true)
 		if err != nil {
-			logger.Log("error", err.Error())
 			return fc.closeTransform
 		}
 		logger.Log("event", "end")
@@ -614,16 +623,19 @@ func (fc *baseFactory) doSyncCycle(t *Transform) stateFunc {
 			fc.pcClient.LogState(t.ctx, pcOrder.ID, pc.StateCanceled, "Canceled by site")
 			newState = pc.StateCanceled
 		} else if ppOrder.Status != pp.StatePrinting {
-			msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", ppOrder.Status, pp.StatePrinting)
-			logger.Log("warning", msg)
-			fc.pcClient.LogState(t.ctx, pcOrder.ID, pc.StateSkiped, msg)
+			if ppOrder.Status != pp.StatePrepressCoordinationAwaitingReply {
+				//don't log in soft error state
+				msg := fmt.Sprintf("Wrong state '%s' in source site, expected '%s'", ppOrder.Status, pp.StatePrinting)
+				logger.Log("warning", msg)
+				fc.pcClient.LogState(t.ctx, pcOrder.ID, pc.StateSkiped, msg)
+			}
 			if time.Since(grps[i].StateDate).Hours() > 24*30 {
 				//state not changed more then 30 days
 				newState = pc.StateCanceled
 				if grps[i].ChildState >= 449 {
 					newState = pc.StateSend
 				}
-				msg = "Forvard state (order date expiry)"
+				msg := "Forvard state (order date expiry)"
 				logger.Log("event", msg)
 				fc.pcClient.LogState(t.ctx, pcOrder.ID, newState, msg)
 			}
@@ -928,6 +940,7 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 		}
 		logger.Log("event", "end")
 		//finalase
+		t.logger = logger
 		fc.finish(t, false)
 	}
 
@@ -1034,6 +1047,8 @@ func (fc *baseFactory) finish(t *Transform, restarted bool) (err error) {
 	defer func() {
 		if err != nil {
 			t.logger.Log("stage", "finish", "elapsed", time.Since(t.Start).String(), "error", err.Error())
+		} else {
+			t.logger.Log("stage", "finish", "elapsed", time.Since(t.Start).String())
 		}
 	}()
 
