@@ -209,8 +209,9 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	server := &http.Server{
 		Addr:         viper.GetString("proxy.address"),
 		Handler:      proxy.New(&pcfg),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  15 * 60 * time.Second,
 	}
 	g.Add(func() error {
 		//logger.Log("transport", "debug/HTTP", "addr", debugAddr)

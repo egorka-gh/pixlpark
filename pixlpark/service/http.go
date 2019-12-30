@@ -105,6 +105,7 @@ func decodeCountOrderResponse(_ context.Context, r *http1.Response) (interface{}
 	}
 	var resp CountOrdersResponse
 	err := json.NewDecoder(r.Body).Decode(&resp)
+	
 	return resp, err
 }
 
@@ -196,15 +197,6 @@ func encodeSetOrderStatusRequest(_ context.Context, r *http1.Request, request in
 		form.Add("sendNotifications", "false")
 	}
 	r.Body = ioutil.NopCloser(strings.NewReader(form.Encode()))
-
-	/*
-		q := r.URL.Query()
-		q.Add("newStatus", req.Status)
-		if req.Notify {
-			q.Add("sendNotifications", "true")
-		}
-		r.URL.RawQuery = q.Encode()
-	*/
 
 	return nil
 }

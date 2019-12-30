@@ -64,6 +64,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	//in case 401 respose reset t.Source and do trip again
+	//TODO req body already closed, weakness? just reset t.Source?
 	if res.StatusCode == 401 {
 		t.Source.Reset()
 		token, err = t.Source.Token()
@@ -71,6 +72,20 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return nil, err
 		}
 		req2 = cloneRequest(req) // per RoundTripper contract
+
+		/*
+		//TODO  Rewind the body if we're able to. (like base transport do)
+		if req.GetBody != nil {
+			newReq := *req
+			var err error
+			newReq.Body, err = req.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			req = &newReq
+		}
+		*/
+
 		token.SetAuthURLParametr(req2)
 		t.setModReq(req, req2)
 		res, err = t.base().RoundTrip(req2)
