@@ -49,6 +49,12 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 		return ErrTransform{fmt.Errorf("Не верное значение sku длины (height) %s", h)}
 	}
 
+	//check if color correction set
+	correction := "N"
+	if c, ok := item.Sku()["correction"]; ok == true && c == "Y" {
+		correction = "Y"
+	}
+
 	//scan item folder for subfolders vs name like copies_d+
 	itemPath := path.Join(fc.wrkFolder, fmt.Sprintf("%d", item.OrderID), item.DirectoryName)
 	itemFolder, err := folderOpen(itemPath)
@@ -97,10 +103,10 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 	}
 	//rename files to awoid name conflicts
 	for i, fl := range withBorders {
-		withBorders[i].NewName = fmt.Sprintf("%dWN_%04d%s", fl.Qtty, i, filepath.Ext(fl.OldName))
+		withBorders[i].NewName = fmt.Sprintf("%dW%s_%04d%s", fl.Qtty, correction, i, filepath.Ext(fl.OldName))
 	}
 	for i, fl := range noBorders {
-		noBorders[i].NewName = fmt.Sprintf("%dCN_%04d%s", fl.Qtty, i, filepath.Ext(fl.OldName))
+		noBorders[i].NewName = fmt.Sprintf("%dC%s_%04d%s", fl.Qtty, correction, i, filepath.Ext(fl.OldName))
 	}
 
 	//copy & create order printgroup(s)/printgroupfiles
@@ -144,6 +150,10 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 				Path:    fmt.Sprintf("%d_%dx%d-%d", len(order.PrintGroups)+1, width, height, paper),
 				State:   order.State,
 			}
+		}
+		//set color correction code
+		if correction == "Y" {
+			pg.Correction = 16
 		}
 		//copy to cycle print folder
 		done, err := listCopy(ctx, list, path.Join(outPath, pg.Path, "print"))
