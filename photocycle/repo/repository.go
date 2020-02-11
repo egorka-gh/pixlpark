@@ -9,18 +9,19 @@ import (
 )
 
 type basicRepository struct {
-	db     *sqlx.DB
-	Source int
+	db *sqlx.DB
+	//	Source   int
+	readOnly bool
 }
 
 //New creates new Repository
-func New(connection string) (cycle.Repository, error) {
-	rep, _, err := NewTest(connection)
+func New(connection string, readOnly bool) (cycle.Repository, error) {
+	rep, _, err := NewTest(connection, readOnly)
 	return rep, err
 }
 
 //NewTest creates new Repository, expect mysql connection sqlx.DB
-func NewTest(connection string) (cycle.Repository, *sqlx.DB, error) {
+func NewTest(connection string, readOnly bool) (cycle.Repository, *sqlx.DB, error) {
 	var db *sqlx.DB
 	db, err := sqlx.Connect("mysql", connection)
 	if err != nil {
@@ -28,7 +29,8 @@ func NewTest(connection string) (cycle.Repository, *sqlx.DB, error) {
 	}
 
 	return &basicRepository{
-		db: db,
+		db:       db,
+		readOnly: readOnly,
 	}, db, nil
 }
 
@@ -37,7 +39,9 @@ func (b *basicRepository) Close() {
 }
 
 func (b *basicRepository) CreateOrder(ctx context.Context, o cycle.Order) error {
-
+	if b.readOnly {
+		return nil
+	}
 	//var ssql = "SELECT source, table_name, latest_version FROM cnv_version WHERE source = ? ORDER BY syncorder"
 	var sb strings.Builder
 	//INSERT IGNORE  ??
@@ -49,6 +53,9 @@ func (b *basicRepository) CreateOrder(ctx context.Context, o cycle.Order) error 
 }
 
 func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) error {
+	if b.readOnly {
+		return nil
+	}
 	//insert orders
 	oSQL := "INSERT INTO orders (id, source, src_id, src_date, data_ts, state, state_date, group_id, ftp_folder, fotos_num, client_id, production) VALUES "
 	oVals := make([]string, 0, len(orders))
@@ -127,18 +134,27 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 }
 
 func (b *basicRepository) ClearGroup(ctx context.Context, source, group int, keepID string) error {
+	if b.readOnly {
+		return nil
+	}
 	sql := "DELETE FROM orders WHERE source =? AND group_id = ? AND ID != ?"
 	_, err := b.db.ExecContext(ctx, sql, source, group, keepID)
 	return err
 }
 
 func (b *basicRepository) SetGroupState(ctx context.Context, source, state, group int, keepID string) error {
+	if b.readOnly {
+		return nil
+	}
 	sql := "UPDATE orders SET state = ? WHERE source =? AND group_id = ? AND ID != ?"
 	_, err := b.db.ExecContext(ctx, sql, state, source, group, keepID)
 	return err
 }
 
 func (b *basicRepository) StartOrders(ctx context.Context, source, group int, skipID string) error {
+	if b.readOnly {
+		return nil
+	}
 	sql := "call pp_StartOrders(?, ?, ?)"
 	_, err := b.db.ExecContext(ctx, sql, source, group, skipID)
 	return err
@@ -153,12 +169,18 @@ func (b *basicRepository) LoadOrder(ctx context.Context, id string) (cycle.Order
 }
 
 func (b *basicRepository) LogState(ctx context.Context, orderID string, state int, message string) error {
+	if b.readOnly {
+		return nil
+	}
 	ssql := "INSERT INTO state_log (order_id, state, state_date, comment) VALUES (?, ?, NOW(), LEFT(?, 250))"
 	_, err := b.db.ExecContext(ctx, ssql, orderID, state, message)
 	return err
 }
 
 func (b *basicRepository) SetOrderState(ctx context.Context, orderID string, state int) error {
+	if b.readOnly {
+		return nil
+	}
 	ssql := "UPDATE orders o SET o.state = ?, o.state_date = Now() WHERE o.id = ?"
 	_, err := b.db.ExecContext(ctx, ssql, state, orderID)
 	return err
@@ -172,6 +194,9 @@ func (b *basicRepository) LoadAlias(ctx context.Context, alias string) (cycle.Al
 }
 
 func (b *basicRepository) AddExtraInfo(ctx context.Context, ei cycle.OrderExtraInfo) error {
+	if b.readOnly {
+		return nil
+	}
 	var sb strings.Builder
 	//INSERT IGNORE  ??
 	sb.WriteString("INSERT INTO order_extra_info (id, endpaper, interlayer, cover, format, corner_type, kaptal, cover_material, books, sheets, date_in, book_thickness, group_id, remark, paper, calc_alias, calc_title, weight)")

@@ -62,8 +62,15 @@ func main() {
 	oauthClient := cnf.Client(context.Background(), nil)
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(log.With(logger, "level", "transport")))
 
-	/* factory test by Order Id */
-	rep, err := repo.New(viper.GetString("mysql"))
+	fmt.Println("Run pixel in debug mode.")
+
+	//check cycle mode
+	debugCycle := viper.GetBool("debug_cycle")
+	if debugCycle {
+		fmt.Println("Run cycle in read only mode.")
+	}
+
+	rep, err := repo.New(viper.GetString("mysql"), debugCycle)
 	if err != nil {
 		logger.Log("Open database error", err.Error())
 		fmt.Printf("Ошибка подключения к базе данных %s\n", err.Error())
@@ -133,6 +140,7 @@ func readConfig() error {
 	viper.SetDefault("pixelpark.oauth.PublicKey", "aac2028cc33c4970b9e1a829ca7acd7b")         //oauth PublicKey
 	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey
 	viper.SetDefault("paperIdMap", map[string]string{"10": "Глянцевая", "11": "Матовая", "12": "Металлик", "13": "Шелк"})
+	viper.SetDefault("debug_cycle", false) //set cycle debug mode (prevent changes in cycle repository)
 
 	path, err := osext.ExecutableFolder()
 	if err != nil {

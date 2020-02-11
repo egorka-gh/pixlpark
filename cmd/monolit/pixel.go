@@ -169,7 +169,7 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	ppClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(log.With(logger, "level", "transport")))
 
 	//create repro
-	rep, err := repo.New(viper.GetString("mysql"))
+	rep, err := repo.New(viper.GetString("mysql"), false)
 	if err != nil {
 		logger.Log("Open database error", err.Error())
 		return nil, nil, fmt.Errorf("Ошибка подключения к базе данных %s", err.Error())
@@ -267,7 +267,8 @@ func readConfig() error {
 	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey
 	viper.SetDefault("proxy.address", ":8888")                                                //localhost
 	viper.SetDefault("paperIdMap", map[string]string{"10": "Глянцевая", "11": "Матовая", "12": "Металлик", "13": "Шелк"})
-	viper.SetDefault("debug", false) //set debug mode (will not change pixel orders states)
+	viper.SetDefault("debug", false)       //set debug mode (will not change pixel orders states)
+	viper.SetDefault("debug_cycle", false) //set cycle debug mode (prevent changes in cycle repository)
 
 	path, err := osext.ExecutableFolder()
 	if err != nil {

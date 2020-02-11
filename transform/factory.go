@@ -996,21 +996,6 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) error {
 		return nil
 	}
 
-	/* no sence, it is notpossible to move state back in frontend
-	if states.BaseState == pc.StateCanceledPHCycle {
-		//cancel in pp
-		err = errors.New("Заказ отменен в PhotoCycle")
-		_ = fc.setPixelState(t, statePixelAbort, err.Error())
-		return err
-	}
-	if states.ChildState > pc.StatePrintWaite {
-		//cancel in pp
-		err = errors.New("Запуск заказа отправленного на печать в PhotoCycle")
-		_ = fc.setPixelState(t, statePixelAbort, err.Error())
-		return err
-	}
-	*/
-
 	//check by fetch state
 	//statePixelLoadStarted
 	if t.fetchState == statePixelLoadStarted {
@@ -1023,14 +1008,6 @@ func (fc *baseFactory) checkCreateInCycle(t *Transform, co pc.Order) error {
 			return err
 		}
 	}
-	/*
-		//statePixelConfirmed
-		if t.fetchState == statePixelConfirmed {
-			//expects that zip loaded
-			//if not or deleted - will restart from very beginning
-			co.State = pc.StateUnzip
-		}
-	*/
 	//clear sub orders
 	if states.ChildState > 0 {
 		_ = fc.pcClient.ClearGroup(t.ctx, fc.source, co.GroupID, co.ID)

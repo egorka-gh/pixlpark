@@ -4,5 +4,6 @@
     "folders.zip": "D:\\Buffer\\pp\\wrk",
     "folders.in": "D:\\Buffer\\ftp\\in\\PXP",
     "folders.prn": "D:\\Buffer\\ftp\\out\\PXP",
-    "folders.log": ".\\log"
+    "folders.log": ".\\log",
+    "debug_cycle": true
 }

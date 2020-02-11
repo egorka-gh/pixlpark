@@ -111,9 +111,16 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 
 	//copy & create order printgroup(s)/printgroupfiles
 	order.PrintGroups = make([]pc.PrintGroup, 0, 2)
+
 	outPath := path.Join(fc.cyclePrtFolder, order.FtpFolder)
+	wrkPath := path.Join(fc.cycleFolder, order.FtpFolder)
 	//clear order print folder
 	err = recreateFolder(outPath)
+	if err != nil {
+		return ErrFileSystem{err}
+	}
+	//clear order ftpin folder
+	err = recreateFolder(wrkPath)
 	if err != nil {
 		return ErrFileSystem{err}
 	}
@@ -134,7 +141,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 				Height:  height,
 				Cutting: 20,
 				Frame:   15,
-				Path:    fmt.Sprintf("%d_%dx%d-%d-b", len(order.PrintGroups)+1, width, height, paper),
+				Path:    fmt.Sprintf("w%d-h%d-p%d-f_b", width, height, paper),
 				State:   order.State,
 			}
 		} else {
@@ -147,7 +154,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 				Height:  height,
 				Cutting: 19,
 				Frame:   0,
-				Path:    fmt.Sprintf("%d_%dx%d-%d", len(order.PrintGroups)+1, width, height, paper),
+				Path:    fmt.Sprintf("w%d-h%d-p%d-f_n", width, height, paper),
 				State:   order.State,
 			}
 		}
@@ -155,6 +162,13 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 		if correction == "Y" {
 			pg.Correction = 16
 		}
+
+		//copy to cycle ftpin folder/orderid/pg.Path
+		_, err = listCopy(ctx, list, path.Join(wrkPath, pg.Path))
+		if err != nil {
+			return err
+		}
+
 		//copy to cycle print folder
 		done, err := listCopy(ctx, list, path.Join(outPath, pg.Path, "print"))
 		if err != nil {
