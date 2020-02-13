@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -360,7 +361,18 @@ func NewMailPackageResponse(order *pp.Order) *BaseResponse {
 	}
 
 	//add properties
-	resp.Properties["lastname"] = order.DeliveryAddress.FullName
+	//reorder iof to fio
+	iof := strings.Fields(strings.Title(order.DeliveryAddress.FullName))
+	if len(iof) > 1 {
+		//iof[0], iof[len(iof)-1] = iof[len(iof)-1], iof[0]
+		fio := make([]string, 0, len(iof))
+		fio = append(fio, iof[len(iof)-1])
+		fio = append(fio, iof[:len(iof)-1]...)
+		resp.Properties["lastname"] = strings.Join(fio, " ")
+	} else {
+		resp.Properties["lastname"] = order.DeliveryAddress.FullName
+	}
+
 	resp.Properties["phone"] = order.DeliveryAddress.Phone
 	//resp.Properties["email"] = TODO get in from User?
 	//resp.Properties["passport"] = TODO
