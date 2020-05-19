@@ -70,7 +70,7 @@ func main() {
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(logger))
 
 	/* factory test by Order Id */
-	rep, err := repo.New(viper.GetString("mysql"))
+	rep, err := repo.New(viper.GetString("mysql"), true)
 	if err != nil {
 		logger.Log("Open database error", err.Error())
 		return
