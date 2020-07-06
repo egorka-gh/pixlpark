@@ -49,20 +49,6 @@ func main() {
 	}
 	/* */
 
-	/*
-		//http://api.staging.pixlpark.com
-		cnf := &oauth.Config{
-			PublicKey:  "2ef2d5233fcc49bba387a51aabefb678",
-			PrivateKey: "24a1aad1c8364d87ae1dde60c8be6dbc",
-			Endpoint: oauth.Endpoint{
-				RequestURL: "http://api.staging.pixlpark.com/oauth/requesttoken",
-				RefreshURL: "http://api.staging.pixlpark.com/oauth/refreshtoken",
-				TokenURL:   "http://api.staging.pixlpark.com/oauth/accesstoken",
-			},
-			//Logger: logger,
-		}
-	*/
-
 	url := "http://api.pixlpark.com"
 	//url := "http://api.staging.pixlpark.com"
 	oauthClient := cnf.Client(context.Background(), nil)
@@ -282,8 +268,8 @@ func readConfig() error {
 	viper.SetDefault("folders.prn", "")                                                       //cycle print folder (out)
 	viper.SetDefault("folders.log", "")                                                       //Log folder
 	viper.SetDefault("pixelpark.user", "photo.cycle@yandex.by")                               //pixelpark user email to post messages to api
-	viper.SetDefault("pixelpark.oauth.PublicKey", "aac2028cc33c4970b9e1a829ca7acd7b")         //oauth PublicKey
-	viper.SetDefault("pixelpark.oauth.PrivateKey", "0227f3943b214603b7fa9431a09b325d")        //oauth PrivateKey
+	viper.SetDefault("pixelpark.oauth.PublicKey", "")                                         //oauth PublicKey
+	viper.SetDefault("pixelpark.oauth.PrivateKey", "")                                        //oauth PrivateKey
 
 	path, err := osext.ExecutableFolder()
 	if err != nil {
