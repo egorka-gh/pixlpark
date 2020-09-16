@@ -298,6 +298,7 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 		//width is truncated (not rounded) so
 		width = width + (butt - math.Floor(item.Sizes.Thickness))
 	}
+	order.Butt = butt
 	//set output names
 	//decode filenames to cycle names '000-00.jpg'
 	//cover 000-00_309_5.jpg
@@ -372,6 +373,7 @@ func buildExtraInfo(forOrder pc.Order, from pp.OrderItem) pc.OrderExtraInfo {
 		Kaptal:        from.Sku()["kaptal"],
 		CoverMaterial: from.Sku()["cover_material"],
 		Weight:        int(math.Round(from.TotalWeight)),
+		BookThickness: forOrder.Butt,
 	}
 
 	//translate paper id

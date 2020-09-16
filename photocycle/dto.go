@@ -53,6 +53,7 @@ type Order struct {
 	Production  int       `json:"production" db:"production"`
 
 	//4 internal use
+	Butt        float64
 	ExtraInfo   OrderExtraInfo
 	HasCover    bool
 	PrintGroups []PrintGroup
@@ -81,7 +82,7 @@ type OrderExtraInfo struct {
 	Books         int       `json:"books" db:"books"`
 	Sheets        int       `json:"sheets" db:"sheets"`
 	Date          time.Time `json:"date_in" db:"date_in"`
-	BookThickness float32   `json:"book_thickness" db:"book_thickness"`
+	BookThickness float64   `json:"book_thickness" db:"book_thickness"`
 	Remark        string    `json:"remark" db:"remark"`
 	Paper         string    `json:"paper" db:"paper"`
 	Alias         string    `json:"calc_alias" db:"calc_alias"`

@@ -447,10 +447,10 @@ func NewClient(ctx context.Context, src TokenSource) *http.Client {
 	if src == nil {
 		return internal.ContextClient(ctx)
 	}
-	//TODO add timeout??
+	//TODO add timeout to config??
 	//timeout := time.Duration(20 * time.Second)
 	return &http.Client{
-		Timeout: time.Second * 20,
+		Timeout: time.Second * 40,
 		Transport: &Transport{
 			Base:   internal.ContextClient(ctx).Transport,
 			Source: ReuseTokenSource(nil, src),
