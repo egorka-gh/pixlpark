@@ -53,8 +53,9 @@ type Order struct {
 	Production  int       `json:"production" db:"production"`
 
 	//4 internal use
-	Butt        float64
-	ExtraInfo   OrderExtraInfo
+	Butt      float64
+	ExtraInfo OrderExtraInfo
+	//HasCover - book with cover, !HasCover - book without cover or not book (has blok only)
 	HasCover    bool
 	PrintGroups []PrintGroup
 }

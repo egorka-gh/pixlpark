@@ -230,6 +230,11 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 	//check maket
 	var pages int
 	isMaket := false
+	//book without cover, but has fake page for cover (placeholder)
+	_, fakeCover := item.Sku()["fake_cover"]
+	if fakeCover {
+		item.PageCount--
+	}
 	pagesStr, ok := item.Sku()["maket"]
 	if ok && pagesStr != "" {
 		isMaket = true
@@ -243,7 +248,7 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 		item.PageCount++
 	}
 
-	err = listIndexSheets(list, alias.HasCover, isMaket)
+	err = listIndexSheets(list, alias.HasCover, isMaket, fakeCover)
 	if err != nil {
 		return ErrParce{err}
 	}
@@ -297,6 +302,13 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 		//correct width
 		//width is truncated (not rounded) so
 		width = width + (butt - math.Floor(item.Sizes.Thickness))
+	}
+	//butt static correction
+	ba, ok := item.Sku()["butt_add"]
+	if ok && ba != "" {
+		if baf, err := strconv.ParseFloat(ba, 64); err == nil {
+			butt += baf
+		}
 	}
 	order.Butt = butt
 	//set output names
@@ -426,7 +438,7 @@ func fillList(path string, qtty int) ([]fileCopy, error) {
 	return res, nil
 }
 
-func listIndexSheets(list []fileCopy, hasCover, isMaket bool) error {
+func listIndexSheets(list []fileCopy, hasCover, isMaket, fakeCover bool) error {
 	rep, err := regexp.Compile(`(_preview\.)`)
 	if err != nil {
 		return err
@@ -467,6 +479,9 @@ func listIndexSheets(list []fileCopy, hasCover, isMaket bool) error {
 						//cover
 						//TODO valid while it is only one cover
 						list[i].SheetIdx = 0
+						if fakeCover {
+							list[i].Process = false
+						}
 						continue
 					}
 				}
@@ -480,7 +495,12 @@ func listIndexSheets(list []fileCopy, hasCover, isMaket bool) error {
 					if err != nil {
 						return err
 					}
-					if !hasCover && !isMaket {
+					//skip fake cover
+					if idx == 0 && fakeCover {
+						list[i].Process = false
+						continue
+					}
+					if !hasCover && !fakeCover && !isMaket {
 						//TODO not shure about idx
 						idx++
 					}
