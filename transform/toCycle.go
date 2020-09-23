@@ -213,6 +213,22 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 	//check if state forwarded
 	if alias.ForwardState > 0 {
 		order.State = alias.ForwardState
+		order.ForwardState = alias.ForwardState
+		order.PrintGroups = make([]pc.PrintGroup, 1)
+		pg := pc.PrintGroup{
+			ID:       fmt.Sprintf("%s_%d", order.ID, len(order.PrintGroups)+1),
+			OrderID:  order.ID,
+			Alias:    alias.Alias,
+			Path:     alias.Alias,
+			State:    order.State,
+			FileNum:  item.Quantity,
+			Prints:   item.Quantity,
+			BookPart: 2,
+		}
+		if alias.Alias == "certificate" {
+			pg.BookType = 9
+		}
+		order.PrintGroups[0] = pg
 		return nil
 	}
 	/*

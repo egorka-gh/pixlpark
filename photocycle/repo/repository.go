@@ -130,6 +130,19 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 		}
 	}
 
+	//start extra state for forvaded orders
+	//extraStateStart(IN pOrder varchar(50), IN pSubOrder varchar(50), IN pState int, IN pDate datetime)
+	fSQL = "call extraStateStart(?, '', ?, NULL);"
+	for _, o := range orders {
+		if o.ForwardState > 0 {
+			_, err = t.Exec(fSQL, o.ID, o.ForwardState)
+			if err != nil {
+				t.Rollback()
+				return err
+			}
+		}
+	}
+
 	return t.Commit()
 }
 
