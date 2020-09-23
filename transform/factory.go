@@ -876,7 +876,10 @@ func (fc *baseFactory) transformItems(t *Transform) stateFunc {
 			//try build photo print
 			//intermediate state for buld photo (then forward to StatePrintWaite)
 			isPhoto = true
-			co.State = pc.StatePreprocessComplite
+			//state can be forwarded
+			if co.State < pc.StatePreprocessComplite {
+				co.State = pc.StatePreprocessComplite
+			}
 			err = fc.transformPhoto(t.ctx, &item, &co)
 		}
 		if err != nil {

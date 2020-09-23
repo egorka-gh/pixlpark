@@ -29,11 +29,12 @@ type Repository interface {
 
 //Alias represents the book_synonym db object
 type Alias struct {
-	ID       int    `json:"id" db:"id"`
-	Alias    string `json:"synonym" db:"synonym"`
-	Type     int    `json:"book_type" db:"book_type"`
-	SubType  int    `json:"synonym_type" db:"synonym_type"`
-	HasCover bool   `json:"has_cover" db:"has_cover"`
+	ID           int    `json:"id" db:"id"`
+	Alias        string `json:"synonym" db:"synonym"`
+	Type         int    `json:"book_type" db:"book_type"`
+	SubType      int    `json:"synonym_type" db:"synonym_type"`
+	HasCover     bool   `json:"has_cover" db:"has_cover"`
+	ForwardState int    `json:"forward" db:"forward"`
 }
 
 //Order represents the Order db object

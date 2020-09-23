@@ -210,6 +210,11 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 		}
 		return ErrTransform{err}
 	}
+	//check if state forwarded
+	if alias.ForwardState > 0 {
+		order.State = alias.ForwardState
+		return nil
+	}
 	/*
 		//TODO implement other types (magnets etc)
 		switch alias.Type {
