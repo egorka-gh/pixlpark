@@ -223,6 +223,7 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 			State:    order.State,
 			FileNum:  item.Quantity,
 			Prints:   item.Quantity,
+			BookNum:  item.Quantity,
 			BookPart: 2,
 		}
 		if alias.Alias == "certificate" {

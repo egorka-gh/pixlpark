@@ -45,7 +45,7 @@ func (d *Date) UnmarshalJSON(b []byte) error {
 	//"/Date(1331083326130)/"
 	//"DateCreated": "/Date(1562920440000)/",
 	//check
-	if len(b) < 11 || string(b[0:6]) != "/Date(" || string(b[len(b)-2:len(b)]) != ")/" {
+	if len(b) < 11 || string(b[0:6]) != "/Date(" || string(b[len(b)-2:]) != ")/" {
 		//wrong format
 		return fmt.Errorf("Wrong date format in %s", string(b[:]))
 	}
