@@ -33,7 +33,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 
 	w, ok := item.Sku()["width"]
 	if !ok || w == "" {
-		return ErrCantTransform{errors.New("Не указан sku ширины (width)")}
+		return ErrTransform{errors.New("Не указан sku ширины (width)")}
 	}
 	width, err := strconv.Atoi(w)
 	if err != nil || width == 0 {
@@ -42,7 +42,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 
 	h, ok := item.Sku()["height"]
 	if !ok || h == "" {
-		return ErrCantTransform{errors.New("Не указан sku длины (height)")}
+		return ErrTransform{errors.New("Не указан sku длины (height)")}
 	}
 	height, err := strconv.Atoi(h)
 	if err != nil || height == 0 {
@@ -96,7 +96,7 @@ func (fc *baseFactory) transformPhoto(ctx context.Context, item *pp.OrderItem, o
 		nbList, _ := fillList(path.Join(basePath, "noborders"), printsCount)
 		if len(bList) == 0 && len(nbList) == 0 {
 			//folders not exists or empty
-			return errCantTransform
+			return ErrTransform{errors.New("Folders with photo not exists or empty (borders, noborders)")}
 		}
 		withBorders = append(withBorders, bList...)
 		noBorders = append(noBorders, nbList...)
