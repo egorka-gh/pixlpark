@@ -11,6 +11,7 @@ import (
 	"time"
 
 	cycle "github.com/egorka-gh/pixlpark/photocycle"
+	"github.com/egorka-gh/pixlpark/photocycle/repo"
 	proxy "github.com/egorka-gh/pixlpark/photocycle/service"
 	"github.com/egorka-gh/pixlpark/pixlpark/oauth"
 	"github.com/egorka-gh/pixlpark/pixlpark/service"
@@ -182,13 +183,13 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	oauthClient := cnf.Client(context.Background(), nil)
 	ppClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(log.With(logger, "level", "transport")))
 
+	//create repro
+	rep, err := repo.New(viper.GetString("mysql"), true)
+	if err != nil {
+		logger.Log("Open database error", err.Error())
+		return nil, nil, fmt.Errorf("Ошибка подключения к базе данных %s", err.Error())
+	}
 	/*
-		//create repro
-		rep, err := repo.New(viper.GetString("mysql"))
-		if err != nil {
-			logger.Log("Open database error", err.Error())
-			return nil, nil, fmt.Errorf("Ошибка подключения к базе данных %s", err.Error())
-		}
 
 		//TODO log startup params
 
@@ -206,6 +207,8 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 	//init proxy
 	pcfg := proxy.Config{
 		PixelClient: ppClient,
+		CycleClient: rep,
+		Source:      viper.GetInt("source.id"),
 	}
 	server := &http.Server{
 		Addr:    viper.GetString("proxy.address"),
