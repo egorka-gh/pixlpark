@@ -322,8 +322,11 @@ func (fc *baseFactory) transformAlias(ctx context.Context, item *pp.OrderItem, o
 		//round up butt to 2
 		butt = math.Ceil(butt/2.0) * 2.0
 		//correct width
-		//width is truncated (not rounded) so
-		width = width + (butt - math.Floor(item.Sizes.Thickness))
+		width = width - item.Sizes.Thickness + butt
+		/*
+			//width is truncated (not rounded) so
+			width = width + (butt - math.Floor(item.Sizes.Thickness))
+		*/
 	}
 	//butt static correction
 	ba, ok := item.Sku()["butt_add"]
