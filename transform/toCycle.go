@@ -491,6 +491,10 @@ func listIndexSheets(list []fileCopy, hasCover, isMaket, fakeCover bool) error {
 	}
 	//m :=re.FindStringSubmatch("surface_[78888](oblozhka)_zone_[0](oblozhka).jpg")
 
+	idxOffset := 0
+	if !hasCover && !fakeCover {
+		idxOffset = 1
+	}
 	for i, fi := range list {
 		if fi.Process {
 			if rep.MatchString(fi.OldName) {
@@ -503,7 +507,7 @@ func listIndexSheets(list []fileCopy, hasCover, isMaket, fakeCover bool) error {
 					if len(sm) > 0 {
 						//cover
 						//TODO valid while it is only one cover
-						list[i].SheetIdx = 0
+						list[i].SheetIdx = 0 + idxOffset
 						if fakeCover {
 							list[i].Process = false
 						}
@@ -525,11 +529,7 @@ func listIndexSheets(list []fileCopy, hasCover, isMaket, fakeCover bool) error {
 						list[i].Process = false
 						continue
 					}
-					if !hasCover && !fakeCover && !isMaket {
-						//TODO not shure about idx
-						idx++
-					}
-					list[i].SheetIdx = idx
+					list[i].SheetIdx = idx + idxOffset
 				}
 			}
 		}
