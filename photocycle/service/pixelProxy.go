@@ -21,6 +21,7 @@ type Config struct {
 	CycleClient pc.Repository
 	Manager     *transform.Manager
 	Source      int
+	IgnoreState bool
 }
 
 type proxy struct {
@@ -132,6 +133,10 @@ func (c *Config) OrderCtx(next http.Handler) http.Handler {
 			return
 		}
 
+		if c.IgnoreState {
+			order.Status = pp.StatePrinting
+		}
+
 		ctx := context.WithValue(r.Context(), "order", &order)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -139,6 +144,14 @@ func (c *Config) OrderCtx(next http.Handler) http.Handler {
 
 //SetOrderState redirects method to pixel api
 func (c *Config) SetOrderState(w http.ResponseWriter, r *http.Request) {
+	if c.IgnoreState {
+		//do nothing, just skin
+		if err := render.Render(w, r, &BaseResponse{Result: message("OK")}); err != nil {
+			render.Render(w, r, ErrRender(err))
+			return
+		}
+	}
+
 	if c.PixelClient == nil {
 		render.Render(w, r, ErrNotConfigured)
 		return

@@ -209,6 +209,7 @@ func initPixel() (*group.Group, cycle.Repository, error) {
 		PixelClient: ppClient,
 		CycleClient: rep,
 		Source:      viper.GetInt("source.id"),
+		IgnoreState: viper.GetBool("debug.ignoreState"),
 	}
 	server := &http.Server{
 		Addr:    viper.GetString("proxy.address"),
@@ -278,6 +279,8 @@ func readConfig() error {
 	viper.SetDefault("pixelpark.oauth.PrivateKey", "")                                        //oauth PrivateKey
 	viper.SetDefault("proxy.address", ":8888")                                                //localhost
 	viper.SetDefault("paperIdMap", map[string]string{"10": "Глянцевая", "11": "Матовая", "12": "Металлик", "13": "Шелк"})
+	viper.SetDefault("debug.ignoreState", false) //ingnore state check and set, get allways return state StateReadyToProcessing
+
 	path, err := osext.ExecutableFolder()
 	if err != nil {
 		path = "."
