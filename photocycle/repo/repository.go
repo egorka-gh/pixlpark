@@ -73,7 +73,14 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 	fVals := make([]string, 0, len(orders)*2*10)
 	fArgs := []interface{}{}
 
+	gMap := make(map[int]cycle.Order)
+	gSQL := "INSERT IGNORE INTO package_new (source, id, client_id, created, attempt) VALUES"
+	gVals := make([]string, 0, 1)
+	gArgs := []interface{}{}
+
 	for _, o := range orders {
+		//collect order groups
+		gMap[o.GroupID] = o
 		//orders
 		oVals = append(oVals, "(?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)")
 		oArgs = append(oArgs, o.ID, o.Source, o.SourceID, o.SourceDate, o.DataTS, o.State, o.GroupID, o.FtpFolder, o.FotosNum, o.ClientID, o.Production)
@@ -93,6 +100,13 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 		}
 	}
 
+	//fill order groups
+	for gID, o := range gMap {
+		gVals = append(gVals, "(?, ?, ?, NOW(), 0)")
+		gArgs = append(gArgs, o.Source, gID, o.ClientID)
+	}
+	gSQL = gSQL + strings.Join(gVals, ",")
+
 	oSQL = oSQL + strings.Join(oVals, ",")
 	xSQL = xSQL + strings.Join(xVals, ",")
 
@@ -104,6 +118,13 @@ func (b *basicRepository) FillOrders(ctx context.Context, orders []cycle.Order) 
 	if err != nil {
 		return err
 	}
+
+	_, err = t.Exec(gSQL, gArgs...)
+	if err != nil {
+		t.Rollback()
+		return err
+	}
+
 	_, err = t.Exec(oSQL, oArgs...)
 	if err != nil {
 		t.Rollback()

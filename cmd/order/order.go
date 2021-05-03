@@ -62,8 +62,6 @@ func main() {
 	oauthClient := cnf.Client(context.Background(), nil)
 	ttClient, _ := service.New(url, defaultHTTPOptions(oauthClient, nil), defaultHTTPMiddleware(log.With(logger, "level", "transport")))
 
-	fmt.Println("Run pixel in debug mode.")
-
 	//check cycle mode
 	debugCycle := viper.GetBool("debug_cycle")
 	if debugCycle {
@@ -77,6 +75,7 @@ func main() {
 		return
 	}
 	fc := transform.NewFactory(ttClient, rep, viper.GetInt("source.id"), viper.GetInt("production"), viper.GetString("folders.zip"), viper.GetString("folders.in"), viper.GetString("folders.prn"), viper.GetString("pixelpark.user"), log.With(logger, "level", "factory"))
+	fmt.Println("Run pixel in debug mode.")
 	fc.SetDebug(true)
 	//oid := "1874839**"
 	fmt.Printf("Страт заказа %s\n", oid)
