@@ -280,6 +280,11 @@ func readConfig() error {
 	viper.SetDefault("proxy.address", ":8888")                                                //localhost
 	viper.SetDefault("paperIdMap", map[string]string{"10": "Глянцевая", "11": "Матовая", "12": "Металлик", "13": "Шелк"})
 	viper.SetDefault("debug.ignoreState", false) //ingnore state check and set, get allways return state StateReadyToProcessing
+	viper.SetDefault("evropochta.baseURL", "https://api.eurotorg.by:10352/Json")
+	viper.SetDefault("evropochta.user", "")
+	viper.SetDefault("evropochta.pass", "")
+	viper.SetDefault("evropochta.serviceNumber", "")
+	viper.SetDefault("evropochta.outFolder", ".\\evropochta")
 
 	path, err := osext.ExecutableFolder()
 	if err != nil {
