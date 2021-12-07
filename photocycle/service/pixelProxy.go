@@ -324,16 +324,20 @@ func NewOrderResponse(order *pp.Order) *BaseResponse {
 
 //MailPackageResponse represents the MailPackage dto for cycle web client
 type MailPackageResponse struct {
-	ID            string            `json:"id"`
-	IDName        string            `json:"number"`
-	ClientID      int               `json:"member_id"`
-	ExecutionDate string            `json:"execution_date"`
-	DeliveryID    int               `json:"delivery_id"`
-	DeliveryName  string            `json:"delivery_title"`
-	StateName     string            `json:"status_text"`
-	Properties    map[string]string `json:"address"`
+	ID            string                       `json:"id"`
+	IDName        string                       `json:"number"`
+	ClientID      int                          `json:"member_id"`
+	ExecutionDate string                       `json:"execution_date"`
+	DeliveryID    int                          `json:"delivery_id"`
+	DeliveryName  string                       `json:"delivery_title"`
+	StateName     string                       `json:"status_text"`
+	Properties    map[string]string            `json:"address"`
+	Barcodes      []MailPackageBarcodeResponse `json:"barcodes"`
 	//TODO messages?
-	//TODO barcodes?
+}
+
+type MailPackageBarcodeResponse struct {
+	Barcode string `json:"barcode"`
 }
 
 //Render implement Renderer
@@ -371,6 +375,10 @@ func NewMailPackageResponse(order *pp.Order) *BaseResponse {
 		DeliveryName: order.Shipping.Title,
 		StateName:    order.Status,
 		Properties:   make(map[string]string),
+	}
+
+	if order.TrackingNumber != "" {
+		resp.Barcodes = []MailPackageBarcodeResponse{{Barcode: order.TrackingNumber}}
 	}
 
 	//add properties
