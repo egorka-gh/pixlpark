@@ -13,7 +13,7 @@ require (
 	github.com/kardianos/service v1.2.0
 	github.com/oklog/oklog v0.3.2
 	github.com/spf13/viper v1.7.1
-	github.com/stretchr/testify v1.7.0 // indirect
-	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4
+	github.com/stretchr/testify v1.7.0
+	golang.org/x/net v0.7.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
